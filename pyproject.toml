@@ -1,0 +1,55 @@
+[project]
+name = "stock-explorer"
+version = "0.1.0"
+description = "A股市场实时检测投资信号系统"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "akquant>=0.1.60",
+    "akshare>=1.18.35",
+    "pandas>=2.2.0",
+    "numpy>=2.2.0",
+    "redis>=5.2.0",
+    "requests>=2.32.0",
+    "aiohttp>=3.11.0",
+    "typer>=0.15.0",
+    "rich>=13.9.0",
+    "pydantic>=2.10.0",
+    "pyyaml>=6.0.2",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.34.0",
+    "watchdog>=6.0.0",
+    "pytest>=9.0.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-timeout>=2.3.0",
+    "ruff>=0.8.0",
+    "mypy>=1.14.0",
+    "pre-commit>=4.1.0",
+]
+
+[project.scripts]
+stock-explorer = "stock_explorer.cli.commands:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false

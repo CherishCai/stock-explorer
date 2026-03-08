@@ -1,0 +1,83 @@
+"""日志模块 - 统一日志管理"""
+
+import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+from rich.logging import RichHandler
+
+
+class Logger:
+    """日志管理器"""
+
+    _loggers: dict = {}
+    _default_level = logging.INFO
+
+    @classmethod
+    def get_logger(
+        cls,
+        name: str,
+        log_file: str | None = None,
+        level: int = _default_level,
+    ) -> logging.Logger:
+        """获取日志记录器"""
+        if name in cls._loggers:
+            return cls._loggers[name]
+
+        logger = logging.getLogger(name)
+        logger.setLevel(level)
+        logger.handlers.clear()
+        logger.propagate = False
+
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d % %H:%M:%S",
+        )
+
+        rich_handler = RichHandler(
+            rich_tracebacks=True,
+            markup=True,
+            show_time=True,
+            show_path=False,
+        )
+        rich_handler.setLevel(level)
+        logger.addHandler(rich_handler)
+
+        if log_file:
+            log_path = Path(log_file)
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+
+            file_handler = RotatingFileHandler(
+                log_file,
+                maxBytes=10 * 1024 * 1024,
+                backupCount=5,
+                encoding="utf-8",
+            )
+            file_handler.setLevel(level)
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+
+        cls._loggers[name] = logger
+        return logger
+
+    @classmethod
+    def set_level(cls, level: int):
+        """设置全局日志级别"""
+        cls._default_level = level
+        for logger in cls._loggers.values():
+            logger.setLevel(level)
+
+
+def get_logger(name: str, log_file: str | None = None) -> logging.Logger:
+    """获取日志记录器的便捷函数"""
+    return Logger.get_logger(name, log_file)
+
+
+def setup_logging(
+    level: int = logging.INFO,
+    log_file: str | None = "logs/app.log",
+):
+    """设置全局日志"""
+    Logger.set_level(level)
+    if log_file:
+        Logger.get_logger("stock_explorer", log_file, level)

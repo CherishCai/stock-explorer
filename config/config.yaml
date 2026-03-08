@@ -1,0 +1,72 @@
+# 沪深300扫描配置
+scan:
+  hs300:
+    enabled: true
+    interval: 5
+    strategies:
+      - golden_cross
+      - capital_flow
+      - limit_up
+
+  market:
+    enabled: true
+    interval: 30
+    strategies:
+      - limit_up
+      - volume_surge
+      - high_turnover
+
+  industry:
+    enabled: true
+    interval: 30
+    industries:
+      - 银行
+      - 证券
+      - 房地产
+      - 医药
+      - 电子
+      - 科技
+      - 新能源
+
+redis:
+  enabled: true
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  realtime_ttl: 10
+  hs300_cache_ttl: 60
+
+sqlite:
+  enabled: true
+  path: "data/stock_explorer.db"
+
+alert:
+  console: true
+  file: true
+  file_path: "logs/signals.log"
+
+  email:
+    enabled: false
+    smtp_host: "smtp.example.com"
+    smtp_port: 465
+    smtp_user: "user@example.com"
+    smtp_password: "your_password"
+    from_addr: "stockbot@example.com"
+    to_addrs:
+      - "receiver1@example.com"
+
+  dingtalk:
+    enabled: false
+    webhook_url: "https://oapi.dingtalk.com/robot/send?access_token=xxx"
+    secret: ""
+
+  min_strength: "medium"
+  exclude_st: true
+  min_market_cap: 10000000000
+  rate_limit_seconds: 60
+
+api:
+  enabled: false
+  host: "0.0.0.0"
+  port: 8000
