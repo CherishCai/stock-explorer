@@ -51,6 +51,7 @@ class CacheExpiryStrategy:
             'realtime': 10,      # 实时数据10秒
             'hs300': 3600,        # 沪深300成分股1小时
             'industry': 3600,     # 行业数据1小时
+            'market': 3600,       # 全市场股票列表1小时
             'kline': 86400,       # K线数据1天
             'signal': 60,          # 信号数据1分钟
             'default': 600         # 默认10分钟

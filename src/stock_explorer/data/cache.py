@@ -58,11 +58,14 @@ class DataCache:
                 try:
                     value = self.redis_client.get(key)
                     if value:
-                        # 提供eval的全局上下文，包含datetime模块
+                        # 提供eval的全局上下文，包含datetime模块和nan值处理
                         import datetime
                         global_vars = {
                             'datetime': datetime,
-                            'time': time
+                            'time': time,
+                            'nan': float('nan'),
+                            'inf': float('inf'),
+                            '-inf': float('-inf')
                         }
                         return eval(value, global_vars)
                 except Exception as e:
@@ -162,6 +165,17 @@ class DataCache:
         key = self.key_generator.generate_key("industry", industry, "stocks")
         ttl = ttl or self.expiry_strategy.get_ttl("industry")
         return self.set(key, stocks, ttl)
+
+    def get_market_stocks(self) -> list[dict] | None:
+        """获取全市场股票列表缓存"""
+        key = self.key_generator.generate_key("market", "stocks")
+        return self.get(key)
+
+    def cache_market_stocks(self, data: list[dict], ttl: int = None) -> bool:
+        """缓存全市场股票列表"""
+        key = self.key_generator.generate_key("market", "stocks")
+        ttl = ttl or self.expiry_strategy.get_ttl("market")
+        return self.set(key, data, ttl)
 
     def increment_signal_counter(self, name: str) -> int:
         """增加信号计数器"""

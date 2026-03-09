@@ -156,27 +156,70 @@ class MarketScanner:
         """
         signals = []
 
+        # 获取实时行情数据
         quotes = self.fetcher.fetch_realtime_quotes()
         if quotes.empty:
             logger.warning("Failed to fetch quotes")
             return signals
 
-        logger.info(f"Scanning {len(quotes)} stocks...")
+        # 构建行情字典
+        quotes_dict = {str(row["代码"]): row.to_dict() for _, row in quotes.iterrows()}
+
+        # 获取缓存的全市场股票列表
+        market_stocks = self._get_market_stocks()
+        if not market_stocks:
+            logger.warning("No market stocks found")
+            return signals
+
+        logger.info(f"Scanning {len(quotes_dict)} stocks...")
 
         detectors = self.signal_registry.get_detectors(strategy_names)
 
         # 准备需要处理的股票数据
         stock_data_list = []
-        for _, row in quotes.iterrows():
-            symbol = str(row.get("代码", ""))
-            name = str(row.get("名称", ""))
+        for stock_info in market_stocks:
+            symbol = str(stock_info.get("代码", ""))
+            name = str(stock_info.get("名称", ""))
+
+            if symbol not in quotes_dict:
+                continue
+
+            quote = quotes_dict[symbol]
 
             stock_data = {
                 "symbol": symbol,
                 "name": name,
-                "quote": row.to_dict(),
+                "quote": quote,
             }
             stock_data_list.append(stock_data)
+
+        # 显示前 N 只股票的数据
+        if show_top > 0 and stock_data_list:
+            from rich.console import Console
+            from rich.table import Table
+            console = Console()
+
+            console.print(f"\n[cyan]扫描的股票示例（前 {min(show_top, len(stock_data_list))} 只）:[/cyan]")
+            table = Table(show_header=True, show_lines=True, row_styles=["", "dim"])
+            table.add_column("代码", style="yellow", width=8)
+            table.add_column("名称", style="green", width=12)
+            table.add_column("最新价", justify="right", width=10)
+            table.add_column("涨跌幅", justify="right", width=10)
+            table.add_column("成交量", justify="right", width=12)
+            table.add_column("成交额", justify="right", width=12)
+
+            for stock_data in stock_data_list[:show_top]:
+                code = str(stock_data.get("symbol", ""))
+                name = str(stock_data.get("name", ""))
+                quote = stock_data.get("quote", {})
+                price = f"{quote.get('最新价', 0):.2f}" if '最新价' in quote else "N/A"
+                change_pct = f"{quote.get('涨跌幅', 0):.2f}%" if '涨跌幅' in quote else "N/A"
+                volume = f"{int(quote.get('成交量', 0)):,}" if '成交量' in quote else "N/A"
+                amount = f"{float(quote.get('成交额', 0)/10000):.2f}万" if '成交额' in quote else "N/A"
+                table.add_row(code, name, price, change_pct, volume, amount)
+
+            console.print(table)
+            console.print()
 
         # 并行处理股票数据
         if stock_data_list:
@@ -286,6 +329,20 @@ class MarketScanner:
 
         result = df.to_dict("records")
         self.cache.cache_hs300_list(result, ttl=3600)
+        return result
+
+    def _get_market_stocks(self) -> list[dict]:
+        """获取全市场股票列表"""
+        cached = self.cache.get_market_stocks()
+        if cached:
+            return cached
+
+        df = self.fetcher.fetch_stock_list()
+        if df is None or df.empty:
+            return []
+
+        result = df.to_dict("records")
+        self.cache.cache_market_stocks(result, ttl=3600)
         return result
 
 

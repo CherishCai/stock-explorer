@@ -168,9 +168,9 @@ def monitor_all(
         console.print(f"\n[cyan]第 {i+1} 次扫描[/cyan]")
 
         # 获取全市场股票列表
-        quotes = scanner.fetcher.fetch_realtime_quotes()
-        if not quotes.empty:
-            console.print(f"[dim]全市场股票数量：{len(quotes)}[/dim]")
+        market_stocks = scanner._get_market_stocks()
+        if market_stocks:
+            console.print(f"[dim]全市场股票数量：{len(market_stocks)}[/dim]")
 
         signals = scanner.scan_all(strategy_list, show_top=show_top)
 
