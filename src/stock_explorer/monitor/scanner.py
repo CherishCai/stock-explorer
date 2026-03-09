@@ -47,7 +47,7 @@ class MarketScanner:
                 logger.warning(f"Detection failed for {stock_data.get('symbol', '')}: {e}")
         return signals
 
-    def scan_hs300(self, strategy_names: list[str]) -> list[Signal]:
+    def scan_hs300(self, strategy_names: list[str], show_top: int = 0) -> list[Signal]:
         """扫描沪深300成分股
 
         扫描沪深300成分股，检测指定策略的信号
@@ -79,8 +79,8 @@ class MarketScanner:
         # 准备需要处理的股票数据
         stock_data_list = []
         for symbol_info in hs300_list:
-            symbol = symbol_info.get("代码", "")
-            name = symbol_info.get("名称", "")
+            symbol = symbol_info.get("成分券代码", "")
+            name = symbol_info.get("成分券名称", "")
 
             if symbol not in quotes_dict:
                 continue
@@ -93,6 +93,34 @@ class MarketScanner:
                 "quote": quote,
             }
             stock_data_list.append(stock_data)
+
+        # 显示前 N 只股票的数据
+        if show_top > 0 and stock_data_list:
+            from rich.console import Console
+            from rich.table import Table
+            console = Console()
+
+            console.print(f"\n[cyan]扫描的股票示例（前 {min(show_top, len(stock_data_list))} 只）:[/cyan]")
+            table = Table(show_header=True, show_lines=True, row_styles=["", "dim"])
+            table.add_column("代码", style="yellow", width=8)
+            table.add_column("名称", style="green", width=12)
+            table.add_column("最新价", justify="right", width=10)
+            table.add_column("涨跌幅", justify="right", width=10)
+            table.add_column("成交量", justify="right", width=12)
+            table.add_column("成交额", justify="right", width=12)
+
+            for stock_data in stock_data_list[:show_top]:
+                code = str(stock_data.get("symbol", ""))
+                name = str(stock_data.get("name", ""))
+                quote = stock_data.get("quote", {})
+                price = f"{quote.get('最新价', 0):.2f}" if '最新价' in quote else "N/A"
+                change_pct = f"{quote.get('涨跌幅', 0):.2f}%" if '涨跌幅' in quote else "N/A"
+                volume = f"{int(quote.get('成交量', 0)):,}" if '成交量' in quote else "N/A"
+                amount = f"{float(quote.get('成交额', 0)/10000):.2f}万" if '成交额' in quote else "N/A"
+                table.add_row(code, name, price, change_pct, volume, amount)
+
+            console.print(table)
+            console.print()
 
         # 并行处理股票数据
         if stock_data_list:
@@ -115,7 +143,7 @@ class MarketScanner:
         logger.info(f"HS300 scan completed: {len(signals)} signals found")
         return signals
 
-    def scan_all(self, strategy_names: list[str]) -> list[Signal]:
+    def scan_all(self, strategy_names: list[str], show_top: int = 0) -> list[Signal]:
         """扫描全市场
 
         扫描全市场股票，检测指定策略的信号
@@ -171,7 +199,7 @@ class MarketScanner:
         logger.info(f"Market scan completed: {len(signals)} signals found")
         return signals
 
-    def scan_industry(self, industry: str, strategy_names: list[str]) -> list[Signal]:
+    def scan_industry(self, industry: str, strategy_names: list[str], show_top: int = 0) -> list[Signal]:
         """扫描特定行业
 
         扫描指定行业的股票，检测指定策略的信号

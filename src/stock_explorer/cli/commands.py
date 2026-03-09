@@ -1,13 +1,15 @@
-"""CLI命令行入口"""
+"""CLI 命令行入口"""
 
 from datetime import datetime, timedelta
 
+import pandas as pd
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from stock_explorer import __version__
 from stock_explorer.config.settings import get_config
+from stock_explorer.data.cache import get_cache
 from stock_explorer.logging.logger import setup_logging
 from stock_explorer.monitor.notifier import create_notifier_manager
 from stock_explorer.monitor.scanner import get_scanner
@@ -114,6 +116,7 @@ def monitor_hs300(
     strategies: str = typer.Option("golden_cross,limit_up", "--strategy", help="策略名称,分隔"),
     interval: int = typer.Option(5, "--interval", "-i", help="扫描间隔(秒)"),
     count: int = typer.Option(1, "--count", "-n", help="扫描次数"),
+    show_top: int = typer.Option(10, "--show-top", "-s", help="显示前 N 只股票的数据"),
 ):
     """沪深300重点监控"""
     console.print(f"[bold]沪深300监控[/bold] - 策略: {strategies}, 间隔: {interval}秒")
@@ -126,7 +129,13 @@ def monitor_hs300(
 
     for i in range(count):
         console.print(f"\n[cyan]第 {i+1} 次扫描[/cyan]")
-        signals = scanner.scan_hs300(strategy_list)
+
+        # 获取 HS300 成分股列表
+        hs300_list = scanner._get_hs300_list()
+        if hs300_list:
+            console.print(f"[dim]HS300 成分股数量：{len(hs300_list)}[/dim]")
+
+        signals = scanner.scan_hs300(strategy_list, show_top=show_top)
 
         if signals:
             for signal in signals:
@@ -144,6 +153,7 @@ def monitor_all(
     strategies: str = typer.Option("limit_up,volume_surge", "--strategy", help="策略名称,分隔"),
     interval: int = typer.Option(30, "--interval", "-i", help="扫描间隔(秒)"),
     count: int = typer.Option(1, "--count", "-n", help="扫描次数"),
+    show_top: int = typer.Option(10, "--show-top", "-s", help="显示前 N 只股票的数据"),
 ):
     """全市场扫描"""
     console.print(f"[bold]全市场监控[/bold] - 策略: {strategies}, 间隔: {interval}秒")
@@ -156,14 +166,17 @@ def monitor_all(
 
     for i in range(count):
         console.print(f"\n[cyan]第 {i+1} 次扫描[/cyan]")
-        signals = scanner.scan_all(strategy_list)
+
+        # 获取全市场股票列表
+        quotes = scanner.fetcher.fetch_realtime_quotes()
+        if not quotes.empty:
+            console.print(f"[dim]全市场股票数量：{len(quotes)}[/dim]")
+
+        signals = scanner.scan_all(strategy_list, show_top=show_top)
 
         if signals:
-            console.print(f"[yellow]发现 {len(signals)} 个信号[/yellow]")
-            for signal in signals[:10]:
+            for signal in signals:
                 notifier.notify(signal)
-            if len(signals) > 10:
-                console.print(f"[dim]... 还有 {len(signals)-10} 个信号[/dim]")
         else:
             console.print("[dim]未检测到信号[/dim]")
 
@@ -178,6 +191,7 @@ def monitor_industry(
     strategies: str = typer.Option("limit_up,volume_surge", "--strategy", help="策略名称,分隔"),
     interval: int = typer.Option(30, "--interval", "-i", help="扫描间隔(秒)"),
     count: int = typer.Option(1, "--count", "-n", help="扫描次数"),
+    show_top: int = typer.Option(10, "--show-top", "-s", help="显示前 N 只股票的数据"),
 ):
     """行业板块监控"""
     console.print(f"[bold]行业监控[/bold] - 行业: {industry}, 策略: {strategies}")
@@ -190,10 +204,15 @@ def monitor_industry(
 
     for i in range(count):
         console.print(f"\n[cyan]第 {i+1} 次扫描[/cyan]")
-        signals = scanner.scan_industry(industry, strategy_list)
+
+        # 获取行业成分股
+        constituents = scanner.fetcher.fetch_stock_board_industry_cons(industry)
+        if not constituents.empty:
+            console.print(f"[dim]{industry} 成分股数量：{len(constituents)}[/dim]")
+
+        signals = scanner.scan_industry(industry, strategy_list, show_top=show_top)
 
         if signals:
-            console.print(f"[yellow]发现 {len(signals)} 个信号[/yellow]")
             for signal in signals:
                 notifier.notify(signal)
         else:
@@ -255,15 +274,95 @@ def data_hs300():
 
 
 @app.command("data-industry")
-def data_industry():
+def data_industry(
+    detail: bool = typer.Option(False, "--detail", "-d", help="显示完整详细信息"),
+    top: int = typer.Option(10, "--top", "-t", help="显示前 N 行详情（仅在 detail 模式下有效）"),
+):
     """获取行业列表"""
     console.print("[bold]行业板块列表:[/bold]")
 
     scanner = get_scanner()
-    industries = scanner.get_industry_list()
+    cache = get_cache()
 
-    for i, industry in enumerate(industries[:30]):
-        console.print(f"{i+1}. {industry}")
+    # 从远程获取
+    df = scanner.fetcher.fetch_industry_classification()
+
+    # 如果获取成功，保存到缓存
+    if not df.empty:
+        cache.set("industry_list", df.to_dict('records'), ttl=3600)  # 缓存 1 小时
+    else:
+        # 远程获取失败，尝试从缓存获取历史数据
+        cached_data = cache.get("industry_list")
+        if cached_data is not None:
+            console.print("[yellow]⚠️  使用缓存的历史数据（远程获取失败）[/yellow]")
+            df = pd.DataFrame(cached_data)
+        else:
+            console.print("[red]❌ 远程获取失败且无缓存数据[/red]")
+
+    if df.empty:
+        console.print("[dim]未获取到行业数据[/dim]")
+        return
+
+    if detail:
+        # 详细模式：显示前 N 行的完整数据
+        console.print(f"[cyan]显示前 {top} 条详细数据:[/cyan]\n")
+        for idx, row in df.head(top).iterrows():
+            console.print(f"[bold green]第 {idx + 1} 条[/bold green]")
+            for col in df.columns:
+                value = row[col]
+                console.print(f"  [yellow]{col}:[/yellow] {value}")
+            console.print()
+        console.print(f"[dim]共 {len(df)} 个行业板块，仅显示前 {top} 条详情[/dim]")
+    else:
+        # 简洁模式：只显示关键列
+        console.print("[dim]提示：使用 --detail 参数查看完整数据[/dim]\n")
+
+        table = Table(show_header=True, show_lines=True, row_styles=["", "dim"], collapse_padding=True)
+
+        # 简洁模式只显示关键列
+        key_columns = ["排名", "板块名称", "板块代码", "最新价", "涨跌幅", "换手率", "总市值", "领涨股票", "领涨股票-涨跌幅"]
+        column_configs = {
+            "排名": {"justify": "right", "width": 5},
+            "板块名称": {"style": "green", "width": 20, "no_wrap": True, "overflow": "ellipsis"},
+            "板块代码": {"style": "yellow", "width": 8},
+            "最新价": {"justify": "right", "width": 10, "no_wrap": True},
+            "涨跌幅": {"justify": "right", "width": 8, "no_wrap": True},
+            "换手率": {"justify": "right", "width": 8, "no_wrap": True},
+            "总市值": {"justify": "right", "width": 12, "no_wrap": True},
+            "领涨股票": {"style": "cyan", "width": 10, "no_wrap": True, "overflow": "ellipsis"},
+            "领涨股票 - 涨跌幅": {"justify": "right", "width": 14, "no_wrap": True},
+        }
+
+        for col in key_columns:
+            if col in df.columns:
+                config = column_configs.get(col, {})
+                table.add_column(str(col), header_style="bold cyan", **config)
+
+        # 转换总市值为亿单位
+        def format_market_cap(value):
+            try:
+                # 转换为浮点数
+                num = float(value)
+                # 转换为亿为单位
+                return f"{num / 100000000:.2f}亿"
+            except (ValueError, TypeError):
+                return str(value)
+
+        for _, row in df.iterrows():
+            values = []
+            for col in key_columns:
+                if col not in df.columns:
+                    continue
+                value = row[col]
+                # 如果是总市值，转换为亿单位
+                if col == "总市值":
+                    values.append(format_market_cap(value))
+                else:
+                    values.append(str(value))
+            table.add_row(*values)
+
+        console.print(table)
+        console.print(f"\n[dim]共 {len(df)} 个行业板块[/dim]")
 
 
 @app.command("list-signals")

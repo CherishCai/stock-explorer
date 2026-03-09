@@ -58,7 +58,7 @@ class ConsoleNotifier(AlertChannelBase):
         return ""
 
     def send(self, message: str, signal: Signal) -> bool:
-        self.format_message(signal)
+        # format_message 已经在 NotifierManager.notify() 中调用过了，这里不需要重复打印
         return True
 
 
