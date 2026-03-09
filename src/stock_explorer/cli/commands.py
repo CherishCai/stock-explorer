@@ -377,7 +377,7 @@ def signals_list(
     db = get_database()
 
     start_date = start or (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-    end_date = end or datetime.now().strftime("%Y-%m-%d")
+    end_date = end or (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
 
     df = db.get_signals(start_date=start_date, end_date=end_date, limit=limit)
 

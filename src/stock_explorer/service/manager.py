@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from stock_explorer.config.settings import get_config
+from stock_explorer.data.storage import get_database
 from stock_explorer.exceptions import ServiceError
 from stock_explorer.logging.logger import get_logger
 from stock_explorer.monitor.notifier import NotifierManager
@@ -48,6 +49,7 @@ class ServiceManager:
         self._scanner: MarketScanner | None = None
         self._notifier: NotifierManager | None = None
         self._thread_pool: ThreadPoolExecutor | None = None
+        self._database = get_database()
 
     def _signal_handler(self, signum, frame):
         logger.info(f"收到信号 {signum}, 准备停止服务...")
@@ -117,53 +119,72 @@ class ServiceManager:
                 self._thread_pool.shutdown(wait=False)
             raise ServiceError(f"服务启动失败: {e}") from e
 
-    def _run_hs300_scanner(self):
+    def _process_signals(self, signals):
+        """处理检测到的信号"""
+        if not signals:
+            return
+
+        # 保存信号到数据库
+        try:
+            signal_dicts = [{
+                'timestamp': signal.timestamp,
+                'symbol': signal.symbol,
+                'name': signal.name,
+                'signal_type': signal.signal_type.value,
+                'direction': signal.direction.value,
+                'strength': signal.strength.value,
+                'price': signal.price,
+                'message': signal.message,
+                'metadata': {}
+            } for signal in signals]
+            self._database.save_signals(signal_dicts)
+        except Exception as e:
+            logger.error(f"保存信号失败: {e}")
+
+        # 发送通知
+        if self.config.enable_notifications and self._thread_pool:
+            futures = []
+            for signal in signals:
+                future = self._thread_pool.submit(self._notifier.notify, signal)
+                futures.append(future)
+            # 等待所有发送完成
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error(f"信号发送失败: {e}")
+
+    def _run_scanner(self, scanner_func, strategies, interval, error_prefix):
+        """通用扫描方法"""
         while not self._stop_event.is_set():
             try:
-                logger.debug("执行 HS300 扫描...")
-                strategies = self.config.hs300_strategies.split(",")
-                signals = self._scanner.scan_hs300(strategies)
-                if signals and self.config.enable_notifications and self._thread_pool:
-                    # 使用线程池并行发送信号
-                    futures = []
-                    for signal in signals:
-                        future = self._thread_pool.submit(self._notifier.send, signal)
-                        futures.append(future)
-                    # 等待所有发送完成
-                    for future in concurrent.futures.as_completed(futures):
-                        try:
-                            future.result()
-                        except Exception as e:
-                            logger.error(f"信号发送失败: {e}")
+                signals = scanner_func(strategies)
+                self._process_signals(signals)
             except Exception as e:
-                logger.error(f"HS300 扫描出错: {e}")
+                logger.error(f"{error_prefix} 扫描出错: {e}")
 
-            self._stop_event.wait(self.config.scan_interval_hs300)
+            self._stop_event.wait(interval)
+
+    def _run_hs300_scanner(self):
+        """运行 HS300 扫描"""
+        def scanner_func(strategies):
+            logger.debug("执行 HS300 扫描...")
+            return self._scanner.scan_hs300(strategies)
+
+        strategies = self.config.hs300_strategies.split(",")
+        self._run_scanner(scanner_func, strategies, self.config.scan_interval_hs300, "HS300")
 
     def _run_market_scanner(self):
-        while not self._stop_event.is_set():
-            try:
-                logger.debug("执行全市场扫描...")
-                strategies = self.config.market_strategies.split(",")
-                signals = self._scanner.scan_all(strategies)
-                if signals and self.config.enable_notifications and self._thread_pool:
-                    # 使用线程池并行发送信号
-                    futures = []
-                    for signal in signals:
-                        future = self._thread_pool.submit(self._notifier.send, signal)
-                        futures.append(future)
-                    # 等待所有发送完成
-                    for future in concurrent.futures.as_completed(futures):
-                        try:
-                            future.result()
-                        except Exception as e:
-                            logger.error(f"信号发送失败: {e}")
-            except Exception as e:
-                logger.error(f"全市场扫描出错: {e}")
+        """运行全市场扫描"""
+        def scanner_func(strategies):
+            logger.debug("执行全市场扫描...")
+            return self._scanner.scan_all(strategies)
 
-            self._stop_event.wait(self.config.scan_interval_market)
+        strategies = self.config.market_strategies.split(",")
+        self._run_scanner(scanner_func, strategies, self.config.scan_interval_market, "全市场")
 
     def _run_industry_scanner(self):
+        """运行行业扫描"""
         while not self._stop_event.is_set():
             try:
                 logger.debug("执行行业扫描...")
@@ -179,18 +200,7 @@ class ServiceManager:
                     except Exception as e:
                         logger.error(f"行业 {industry} 扫描出错: {e}")
 
-                if all_signals and self.config.enable_notifications and self._thread_pool:
-                    # 使用线程池并行发送信号
-                    futures = []
-                    for signal in all_signals:
-                        future = self._thread_pool.submit(self._notifier.send, signal)
-                        futures.append(future)
-                    # 等待所有发送完成
-                    for future in concurrent.futures.as_completed(futures):
-                        try:
-                            future.result()
-                        except Exception as e:
-                            logger.error(f"信号发送失败: {e}")
+                self._process_signals(all_signals)
             except Exception as e:
                 logger.error(f"行业扫描出错: {e}")
 
@@ -251,6 +261,7 @@ class AsyncServiceManager:
         self._scanner: MarketScanner | None = None
         self._notifier: NotifierManager | None = None
         self._semaphore: asyncio.Semaphore | None = None  # 用于控制并发数
+        self._database = get_database()
 
     async def start(self):
         if self.status == ServiceStatus.RUNNING:
@@ -287,49 +298,68 @@ class AsyncServiceManager:
             self.status = ServiceStatus.ERROR
             raise ServiceError(f"服务启动失败: {e}") from e
 
-    async def _run_hs300_scanner(self):
+    async def _process_signals(self, signals):
+        """处理检测到的信号"""
+        if not signals:
+            return
+
+        # 保存信号到数据库
+        try:
+            signal_dicts = [{
+                'timestamp': signal.timestamp,
+                'symbol': signal.symbol,
+                'name': signal.name,
+                'signal_type': signal.signal_type.value,
+                'direction': signal.direction.value,
+                'strength': signal.strength.value,
+                'price': signal.price,
+                'message': signal.message,
+                'metadata': {}
+            } for signal in signals]
+            await asyncio.to_thread(self._database.save_signals, signal_dicts)
+        except Exception as e:
+            logger.error(f"保存信号失败: {e}")
+
+        # 发送通知
+        if self.config.enable_notifications:
+            tasks = []
+            for signal in signals:
+                task = asyncio.create_task(asyncio.to_thread(self._notifier.notify, signal))
+                tasks.append(task)
+            # 等待所有发送完成
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _run_scanner(self, scanner_func, strategies, interval, error_prefix):
+        """通用扫描方法"""
         while self.status == ServiceStatus.RUNNING:
             try:
-                strategies = self.config.hs300_strategies.split(",")
-                # 使用信号量控制并发
                 async with self._semaphore:
-                    signals = await asyncio.to_thread(self._scanner.scan_hs300, strategies)
-                    if signals and self.config.enable_notifications:
-                        # 并行发送信号
-                        tasks = []
-                        for signal in signals:
-                            task = asyncio.create_task(asyncio.to_thread(self._notifier.send, signal))
-                            tasks.append(task)
-                        # 等待所有发送完成
-                        if tasks:
-                            await asyncio.gather(*tasks, return_exceptions=True)
+                    signals = await asyncio.to_thread(scanner_func, strategies)
+                    await self._process_signals(signals)
             except Exception as e:
-                logger.error(f"HS300 扫描出错: {e}")
+                logger.error(f"{error_prefix} 扫描出错: {e}")
 
-            await asyncio.sleep(self.config.scan_interval_hs300)
+            await asyncio.sleep(interval)
+
+    async def _run_hs300_scanner(self):
+        """运行 HS300 扫描"""
+        def scanner_func(strategies):
+            return self._scanner.scan_hs300(strategies)
+
+        strategies = self.config.hs300_strategies.split(",")
+        await self._run_scanner(scanner_func, strategies, self.config.scan_interval_hs300, "HS300")
 
     async def _run_market_scanner(self):
-        while self.status == ServiceStatus.RUNNING:
-            try:
-                strategies = self.config.market_strategies.split(",")
-                # 使用信号量控制并发
-                async with self._semaphore:
-                    signals = await asyncio.to_thread(self._scanner.scan_all, strategies)
-                    if signals and self.config.enable_notifications:
-                        # 并行发送信号
-                        tasks = []
-                        for signal in signals:
-                            task = asyncio.create_task(asyncio.to_thread(self._notifier.send, signal))
-                            tasks.append(task)
-                        # 等待所有发送完成
-                        if tasks:
-                            await asyncio.gather(*tasks, return_exceptions=True)
-            except Exception as e:
-                logger.error(f"全市场扫描出错: {e}")
+        """运行全市场扫描"""
+        def scanner_func(strategies):
+            return self._scanner.scan_all(strategies)
 
-            await asyncio.sleep(self.config.scan_interval_market)
+        strategies = self.config.market_strategies.split(",")
+        await self._run_scanner(scanner_func, strategies, self.config.scan_interval_market, "全市场")
 
     async def _run_industry_scanner(self):
+        """运行行业扫描"""
         while self.status == ServiceStatus.RUNNING:
             try:
                 strategies = self.config.industry_strategies.split(",")
@@ -346,15 +376,7 @@ class AsyncServiceManager:
                     except Exception as e:
                         logger.error(f"行业 {industry} 扫描出错: {e}")
 
-                if all_signals and self.config.enable_notifications:
-                    # 并行发送信号
-                    tasks = []
-                    for signal in all_signals:
-                        task = asyncio.create_task(asyncio.to_thread(self._notifier.send, signal))
-                        tasks.append(task)
-                    # 等待所有发送完成
-                    if tasks:
-                        await asyncio.gather(*tasks, return_exceptions=True)
+                await self._process_signals(all_signals)
             except Exception as e:
                 logger.error(f"行业扫描出错: {e}")
 
