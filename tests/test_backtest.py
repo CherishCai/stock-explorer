@@ -1,4 +1,5 @@
 """回测引擎测试"""
+
 import sys
 from pathlib import Path as SysPath
 
@@ -101,7 +102,9 @@ class TestBacktestEngine:
         assert engine.positions["000001"].unrealized_pnl == 1000.0
 
     def test_calculate_commission(self, engine):
-        commission = engine.calculate_commission(price=10.0, quantity=1000, direction=PositionSide.LONG)
+        commission = engine.calculate_commission(
+            price=10.0, quantity=1000, direction=PositionSide.LONG
+        )
         assert commission > 0
 
     def test_generate_result(self, engine):

@@ -179,7 +179,9 @@ class DingTalkNotifier(AlertChannelBase):
                 secret_enc = self.secret.encode("utf-8")
                 string_to_sign = f"{timestamp}\n{self.secret}"
                 string_to_sign_enc = string_to_sign.encode("utf-8")
-                hmac_code = hmac.new(secret_enc, string_to_sign_enc, digestmod=hashlib.sha256).digest()
+                hmac_code = hmac.new(
+                    secret_enc, string_to_sign_enc, digestmod=hashlib.sha256
+                ).digest()
                 sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
                 url = f"{self.webhook_url}&timestamp={timestamp}&sign={sign}"
 

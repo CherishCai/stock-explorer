@@ -1,7 +1,5 @@
 """技术面信号检测器"""
 
-
-
 from stock_explorer.signal.base import (
     Signal,
     SignalDirection,
@@ -32,7 +30,7 @@ class GoldenCrossDetector(KlineBasedDetector):
 
     def _perform_detection(self, data: dict) -> Signal | None:
         """执行检测"""
-        df = data['df']
+        df = data["df"]
         close = df["close"] if "close" in df.columns else df["收盘"]
 
         ma_short = TechnicalIndicators.sma(close, self.short_period)
@@ -72,7 +70,7 @@ class DeathCrossDetector(KlineBasedDetector):
 
     def _perform_detection(self, data: dict) -> Signal | None:
         """执行检测"""
-        df = data['df']
+        df = data["df"]
         close = df["close"] if "close" in df.columns else df["收盘"]
 
         ma_short = TechnicalIndicators.sma(close, self.short_period)
@@ -114,7 +112,7 @@ class RSIDetector(KlineBasedDetector):
 
     def _perform_detection(self, data: dict) -> Signal | None:
         """执行检测"""
-        df = data['df']
+        df = data["df"]
         close = df["close"] if "close" in df.columns else df["收盘"]
 
         rsi = TechnicalIndicators.rsi(close, self.period)
@@ -165,7 +163,7 @@ class VolumeSurgeDetector(KlineBasedDetector):
 
     def _perform_detection(self, data: dict) -> Signal | None:
         """执行检测"""
-        df = data['df']
+        df = data["df"]
         volume_col = "volume" if "volume" in df.columns else "成交量"
         close_col = "close" if "close" in df.columns else "收盘"
 
@@ -183,7 +181,7 @@ class VolumeSurgeDetector(KlineBasedDetector):
                 direction=SignalDirection.BUY,
                 strength=SignalStrength.MEDIUM,
                 price=float(df[close_col].iloc[-1]),
-                message=f"放量信号: 成交量放大{recent_volume/avg_volume:.1f}倍",
+                message=f"放量信号: 成交量放大{recent_volume / avg_volume:.1f}倍",
                 metadata={"volume_ratio": float(recent_volume / avg_volume)},
             )
         return None
@@ -265,14 +263,14 @@ class BreakoutDetector(KlineBasedDetector):
 
     def _perform_detection(self, data: dict) -> Signal | None:
         """执行检测"""
-        df = data['df']
+        df = data["df"]
         high_col = "high" if "high" in df.columns else "最高"
         close_col = "close" if "close" in df.columns else "收盘"
 
         if high_col not in df.columns:
             return None
 
-        highest = df[high_col].iloc[-self.lookback_period:-1].max()
+        highest = df[high_col].iloc[-self.lookback_period : -1].max()
         current_high = df[high_col].iloc[-1]
 
         if current_high > highest:

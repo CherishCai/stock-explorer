@@ -1,4 +1,5 @@
 """数据存储模块测试"""
+
 import os
 import tempfile
 
@@ -29,15 +30,17 @@ class TestDataStorage:
     def test_save_kline(self):
         """测试保存K线数据"""
         # 创建测试数据
-        df = pd.DataFrame({
-            "date": ["2024-01-01", "2024-01-02"],
-            "open": [10.0, 10.5],
-            "high": [11.0, 11.5],
-            "low": [9.5, 10.0],
-            "close": [10.5, 11.0],
-            "volume": [1000000, 1200000],
-            "amount": [10500000, 13200000]
-        })
+        df = pd.DataFrame(
+            {
+                "date": ["2024-01-01", "2024-01-02"],
+                "open": [10.0, 10.5],
+                "high": [11.0, 11.5],
+                "low": [9.5, 10.0],
+                "close": [10.5, 11.0],
+                "volume": [1000000, 1200000],
+                "amount": [10500000, 13200000],
+            }
+        )
 
         # 保存K线数据
         self.storage.save_kline(df, "000001", "daily")
@@ -50,15 +53,17 @@ class TestDataStorage:
     def test_get_kline(self):
         """测试获取K线数据"""
         # 先保存数据
-        df = pd.DataFrame({
-            "date": ["2024-01-01", "2024-01-02"],
-            "open": [10.0, 10.5],
-            "high": [11.0, 11.5],
-            "low": [9.5, 10.0],
-            "close": [10.5, 11.0],
-            "volume": [1000000, 1200000],
-            "amount": [10500000, 13200000]
-        })
+        df = pd.DataFrame(
+            {
+                "date": ["2024-01-01", "2024-01-02"],
+                "open": [10.0, 10.5],
+                "high": [11.0, 11.5],
+                "low": [9.5, 10.0],
+                "close": [10.5, 11.0],
+                "volume": [1000000, 1200000],
+                "amount": [10500000, 13200000],
+            }
+        )
         self.storage.save_kline(df, "000001", "daily")
 
         # 获取数据
@@ -80,7 +85,7 @@ class TestDataStorage:
                 "strength": "strong",
                 "price": 10.5,
                 "message": "金叉信号",
-                "metadata": {"indicator": "MA"}
+                "metadata": {"indicator": "MA"},
             }
         ]
 
@@ -105,7 +110,7 @@ class TestDataStorage:
                 "strength": "strong",
                 "price": 10.5,
                 "message": "金叉信号",
-                "metadata": {"indicator": "MA"}
+                "metadata": {"indicator": "MA"},
             }
         ]
         self.storage.save_signals(signals)
@@ -129,13 +134,15 @@ class TestDataStorage:
                 "strength": "strong",
                 "price": 10.5,
                 "message": "金叉信号",
-                "metadata": {"indicator": "MA"}
+                "metadata": {"indicator": "MA"},
             }
         ]
         self.storage.save_signals(signals)
 
         # 获取信号ID
-        signal_id = self.storage.get_signals("2024-01-01 00:00:00", "2024-01-01 23:59:59").iloc[0]['id']
+        signal_id = self.storage.get_signals("2024-01-01 00:00:00", "2024-01-01 23:59:59").iloc[0][
+            "id"
+        ]
 
         # 创建测试告警
         alert = {
@@ -144,7 +151,7 @@ class TestDataStorage:
             "channel": "console",
             "status": "sent",
             "message": "金叉信号",
-            "response": "Success"
+            "response": "Success",
         }
 
         # 保存告警
@@ -168,12 +175,14 @@ class TestDataStorage:
                 "strength": "strong",
                 "price": 10.5,
                 "message": "金叉信号",
-                "metadata": {"indicator": "MA"}
+                "metadata": {"indicator": "MA"},
             }
         ]
         self.storage.save_signals(signals)
 
-        signal_id = self.storage.get_signals("2024-01-01 00:00:00", "2024-01-01 23:59:59").iloc[0]['id']
+        signal_id = self.storage.get_signals("2024-01-01 00:00:00", "2024-01-01 23:59:59").iloc[0][
+            "id"
+        ]
 
         alert = {
             "signal_id": signal_id,
@@ -181,7 +190,7 @@ class TestDataStorage:
             "channel": "console",
             "status": "sent",
             "message": "金叉信号",
-            "response": "Success"
+            "response": "Success",
         }
         self.storage.save_alert(alert)
 
@@ -196,7 +205,7 @@ class TestDataStorage:
         # 创建测试监控列表
         symbols = [
             {"symbol": "000001", "name": "平安银行", "category": "hs300", "enabled": 1},
-            {"symbol": "600036", "name": "招商银行", "category": "hs300", "enabled": 1}
+            {"symbol": "600036", "name": "招商银行", "category": "hs300", "enabled": 1},
         ]
 
         # 保存监控列表
@@ -211,28 +220,30 @@ class TestDataStorage:
         # 先保存监控列表
         symbols = [
             {"symbol": "000001", "name": "平安银行", "category": "hs300", "enabled": 1},
-            {"symbol": "600036", "name": "招商银行", "category": "hs300", "enabled": 1}
+            {"symbol": "600036", "name": "招商银行", "category": "hs300", "enabled": 1},
         ]
         self.storage.save_watchlist(symbols)
 
         # 获取监控列表
         result = self.storage.get_watchlist()
         assert len(result) == 2
-        assert result[0]['symbol'] == "000001"
-        assert result[1]['symbol'] == "600036"
+        assert result[0]["symbol"] == "000001"
+        assert result[1]["symbol"] == "600036"
 
     def test_clear_table(self):
         """测试清空表数据"""
         # 先保存一些数据
-        df = pd.DataFrame({
-            "date": ["2024-01-01", "2024-01-02"],
-            "open": [10.0, 10.5],
-            "high": [11.0, 11.5],
-            "low": [9.5, 10.0],
-            "close": [10.5, 11.0],
-            "volume": [1000000, 1200000],
-            "amount": [10500000, 13200000]
-        })
+        df = pd.DataFrame(
+            {
+                "date": ["2024-01-01", "2024-01-02"],
+                "open": [10.0, 10.5],
+                "high": [11.0, 11.5],
+                "low": [9.5, 10.0],
+                "close": [10.5, 11.0],
+                "volume": [1000000, 1200000],
+                "amount": [10500000, 13200000],
+            }
+        )
         self.storage.save_kline(df, "000001", "daily")
 
         # 验证数据存在

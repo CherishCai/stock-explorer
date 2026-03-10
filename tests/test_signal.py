@@ -1,4 +1,5 @@
 """信号检测器测试"""
+
 import sys
 from pathlib import Path
 
@@ -49,12 +50,14 @@ class TestTechnicalIndicators:
 class TestSignalModels:
     def test_signal_type_enum_values(self):
         from stock_explorer.signal.base import SignalType
+
         signal_types = [e.value for e in SignalType]
         assert isinstance(signal_types, list)
         assert len(signal_types) > 0
 
     def test_signal_direction_enum_values(self):
         from stock_explorer.signal.base import SignalDirection
+
         directions = [e.value for e in SignalDirection]
         assert isinstance(directions, list)
         assert len(directions) > 0

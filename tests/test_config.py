@@ -1,4 +1,5 @@
 """配置与存储测试"""
+
 import sys
 from pathlib import Path as SysPath
 

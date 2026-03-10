@@ -1,4 +1,5 @@
 """服务管理器 - 管理信号检测服务的启动、运行和停止"""
+
 import asyncio
 import concurrent.futures
 import signal
@@ -9,11 +10,14 @@ from dataclasses import dataclass
 from enum import Enum
 
 from stock_explorer.config.settings import get_config
+from stock_explorer.data.cache import get_cache
+from stock_explorer.data.fetcher import get_fetcher
 from stock_explorer.data.storage import get_database
 from stock_explorer.exceptions import ServiceError
 from stock_explorer.logging.logger import get_logger
 from stock_explorer.monitor.notifier import NotifierManager
 from stock_explorer.monitor.scanner import MarketScanner
+from stock_explorer.service.scheduler import TaskScheduler
 
 logger = get_logger(__name__)
 
@@ -50,6 +54,9 @@ class ServiceManager:
         self._notifier: NotifierManager | None = None
         self._thread_pool: ThreadPoolExecutor | None = None
         self._database = get_database()
+        self._cache = get_cache()
+        self._fetcher = get_fetcher()
+        self._scheduler = None
 
     def _signal_handler(self, signum, frame):
         logger.info(f"收到信号 {signum}, 准备停止服务...")
@@ -108,6 +115,19 @@ class ServiceManager:
                 industry_thread.start()
                 logger.info("行业扫描线程已启动")
 
+            # 初始化任务调度器
+            self._scheduler = TaskScheduler()
+
+            # 添加每周三下午两点刷新缓存数据的任务
+            # cron表达式：0 14 * * 3 表示每周三14:00执行
+            self._scheduler.add_cron_task(
+                name="refresh_cache", func=self._refresh_cache_data, cron_expr="0 14 * * 3"
+            )
+
+            # 启动任务调度器
+            self._scheduler.start()
+            logger.info("任务调度器已启动，添加了每周三下午两点刷新缓存的任务")
+
             self.status = ServiceStatus.RUNNING
             logger.info("信号检测服务已启动")
 
@@ -126,17 +146,20 @@ class ServiceManager:
 
         # 保存信号到数据库
         try:
-            signal_dicts = [{
-                'timestamp': signal.timestamp,
-                'symbol': signal.symbol,
-                'name': signal.name,
-                'signal_type': signal.signal_type.value,
-                'direction': signal.direction.value,
-                'strength': signal.strength.value,
-                'price': signal.price,
-                'message': signal.message,
-                'metadata': {}
-            } for signal in signals]
+            signal_dicts = [
+                {
+                    "timestamp": signal.timestamp,
+                    "symbol": signal.symbol,
+                    "name": signal.name,
+                    "signal_type": signal.signal_type.value,
+                    "direction": signal.direction.value,
+                    "strength": signal.strength.value,
+                    "price": signal.price,
+                    "message": signal.message,
+                    "metadata": {},
+                }
+                for signal in signals
+            ]
             self._database.save_signals(signal_dicts)
         except Exception as e:
             logger.error(f"保存信号失败: {e}")
@@ -167,6 +190,7 @@ class ServiceManager:
 
     def _run_hs300_scanner(self):
         """运行 HS300 扫描"""
+
         def scanner_func(strategies):
             logger.debug("执行 HS300 扫描...")
             return self._scanner.scan_hs300(strategies)
@@ -176,6 +200,7 @@ class ServiceManager:
 
     def _run_market_scanner(self):
         """运行全市场扫描"""
+
         def scanner_func(strategies):
             logger.debug("执行全市场扫描...")
             return self._scanner.scan_all(strategies)
@@ -227,11 +252,17 @@ class ServiceManager:
         # 停止配置文件监控
         try:
             from stock_explorer.config.settings import ConfigLoader
+
             config_loader = ConfigLoader()
-            if hasattr(config_loader, 'stop_watcher'):
+            if hasattr(config_loader, "stop_watcher"):
                 config_loader.stop_watcher()
         except Exception as e:
             logger.error(f"停止配置文件监控失败: {e}")
+
+        # 停止任务调度器
+        if self._scheduler:
+            self._scheduler.stop()
+            logger.info("任务调度器已停止")
 
         self._threads.clear()
         self.status = ServiceStatus.STOPPED
@@ -251,6 +282,42 @@ class ServiceManager:
             "market_enabled": self.config.enable_market_scan,
             "industry_enabled": self.config.enable_industry_scan,
         }
+
+    def _refresh_cache_data(self):
+        """刷新缓存数据
+
+        刷新行业列表和沪深300成分股数据
+        调用远程失败不用重试
+        """
+        logger.info("开始刷新缓存数据...")
+
+        try:
+            # 刷新沪深300成分股
+            logger.info("刷新沪深300成分股数据...")
+            df = self._fetcher.fetch_hs300_constituents()
+            if not df.empty:
+                result = df.to_dict("records")
+                self._cache.cache_hs300_list(result)
+                logger.info(f"沪深300成分股数据刷新成功，共 {len(result)} 条")
+            else:
+                logger.warning("沪深300成分股数据获取失败")
+        except Exception as e:
+            logger.error(f"刷新沪深300成分股数据失败: {e}")
+
+        try:
+            # 刷新行业列表
+            logger.info("刷新行业列表数据...")
+            df = self._fetcher.fetch_industry_classification()
+            if not df.empty:
+                industry_list = df["板块名称"].tolist() if "板块名称" in df.columns else []
+                self._cache.cache_industry_list(industry_list)
+                logger.info(f"行业列表数据刷新成功，共 {len(industry_list)} 条")
+            else:
+                logger.warning("行业列表数据获取失败")
+        except Exception as e:
+            logger.error(f"刷新行业列表数据失败: {e}")
+
+        logger.info("缓存数据刷新完成")
 
 
 class AsyncServiceManager:
@@ -305,17 +372,20 @@ class AsyncServiceManager:
 
         # 保存信号到数据库
         try:
-            signal_dicts = [{
-                'timestamp': signal.timestamp,
-                'symbol': signal.symbol,
-                'name': signal.name,
-                'signal_type': signal.signal_type.value,
-                'direction': signal.direction.value,
-                'strength': signal.strength.value,
-                'price': signal.price,
-                'message': signal.message,
-                'metadata': {}
-            } for signal in signals]
+            signal_dicts = [
+                {
+                    "timestamp": signal.timestamp,
+                    "symbol": signal.symbol,
+                    "name": signal.name,
+                    "signal_type": signal.signal_type.value,
+                    "direction": signal.direction.value,
+                    "strength": signal.strength.value,
+                    "price": signal.price,
+                    "message": signal.message,
+                    "metadata": {},
+                }
+                for signal in signals
+            ]
             await asyncio.to_thread(self._database.save_signals, signal_dicts)
         except Exception as e:
             logger.error(f"保存信号失败: {e}")
@@ -344,6 +414,7 @@ class AsyncServiceManager:
 
     async def _run_hs300_scanner(self):
         """运行 HS300 扫描"""
+
         def scanner_func(strategies):
             return self._scanner.scan_hs300(strategies)
 
@@ -352,11 +423,14 @@ class AsyncServiceManager:
 
     async def _run_market_scanner(self):
         """运行全市场扫描"""
+
         def scanner_func(strategies):
             return self._scanner.scan_all(strategies)
 
         strategies = self.config.market_strategies.split(",")
-        await self._run_scanner(scanner_func, strategies, self.config.scan_interval_market, "全市场")
+        await self._run_scanner(
+            scanner_func, strategies, self.config.scan_interval_market, "全市场"
+        )
 
     async def _run_industry_scanner(self):
         """运行行业扫描"""
@@ -371,7 +445,9 @@ class AsyncServiceManager:
                     try:
                         # 使用信号量控制并发
                         async with self._semaphore:
-                            industry_signals = await asyncio.to_thread(self._scanner.scan_industry, industry, strategies)
+                            industry_signals = await asyncio.to_thread(
+                                self._scanner.scan_industry, industry, strategies
+                            )
                             all_signals.extend(industry_signals)
                     except Exception as e:
                         logger.error(f"行业 {industry} 扫描出错: {e}")
@@ -397,8 +473,9 @@ class AsyncServiceManager:
         # 停止配置文件监控
         try:
             from stock_explorer.config.settings import ConfigLoader
+
             config_loader = ConfigLoader()
-            if hasattr(config_loader, 'stop_watcher'):
+            if hasattr(config_loader, "stop_watcher"):
                 config_loader.stop_watcher()
         except Exception as e:
             logger.error(f"停止配置文件监控失败: {e}")

@@ -24,10 +24,10 @@ class DataCache:
         if self.redis_enabled and redis_config:
             try:
                 self.redis_client = redis.Redis(
-                    host=redis_config.get('host', 'localhost'),
-                    port=redis_config.get('port', 6379),
-                    password=redis_config.get('password'),
-                    db=redis_config.get('db', 0)
+                    host=redis_config.get("host", "localhost"),
+                    port=redis_config.get("port", 6379),
+                    password=redis_config.get("password"),
+                    db=redis_config.get("db", 0),
                 )
                 self.redis_client.ping()
                 logger.info("Redis 连接成功")
@@ -49,6 +49,7 @@ class DataCache:
             if key in self.memory_cache:
                 expiry = self.cache_expiry.get(key, 0)
                 if time.time() < expiry:
+                    logger.info(f"从内存缓存获取数据: {key}")
                     return self.memory_cache[key]
                 else:
                     self._remove_from_memory(key)
@@ -58,19 +59,22 @@ class DataCache:
                 try:
                     value = self.redis_client.get(key)
                     if value:
+                        logger.info(f"从Redis缓存获取数据: {key}")
                         # 提供eval的全局上下文，包含datetime模块和nan值处理
                         import datetime
+
                         global_vars = {
-                            'datetime': datetime,
-                            'time': time,
-                            'nan': float('nan'),
-                            'inf': float('inf'),
-                            '-inf': float('-inf')
+                            "datetime": datetime,
+                            "time": time,
+                            "nan": float("nan"),
+                            "inf": float("inf"),
+                            "-inf": float("-inf"),
                         }
                         return eval(value, global_vars)
                 except Exception as e:
                     logger.error(f"Redis get 失败: {e}")
 
+            logger.debug(f"缓存未命中: {key}")
             return None
         except Exception as e:
             logger.error(f"获取缓存失败: {e}")
@@ -104,7 +108,9 @@ class DataCache:
 
         # 如果仍然超过大小限制，移除最旧的数据
         if len(self.memory_cache) >= self.max_size:
-            oldest_keys = sorted(self.cache_expiry.items(), key=lambda x: x[1])[:len(self.memory_cache) - self.max_size + 1]
+            oldest_keys = sorted(self.cache_expiry.items(), key=lambda x: x[1])[
+                : len(self.memory_cache) - self.max_size + 1
+            ]
             for key, _ in oldest_keys:
                 self._remove_from_memory(key)
 
@@ -159,6 +165,28 @@ class DataCache:
         """获取行业成分股缓存"""
         key = self.key_generator.generate_key("industry", industry, "stocks")
         return self.get(key)
+
+    def get_industry_list(self) -> list[str] | None:
+        """获取行业列表缓存"""
+        key = self.key_generator.generate_key("industry", "list")
+        return self.get(key)
+
+    def cache_industry_list(self, data: list[str], ttl: int = None) -> bool:
+        """缓存行业列表"""
+        key = self.key_generator.generate_key("industry", "list")
+        ttl = ttl or self.expiry_strategy.get_ttl("industry")
+        return self.set(key, data, ttl)
+
+    def get_industry_data(self) -> list[dict] | None:
+        """获取完整行业数据缓存"""
+        key = self.key_generator.generate_key("industry", "data")
+        return self.get(key)
+
+    def cache_industry_data(self, data: list[dict], ttl: int = None) -> bool:
+        """缓存完整行业数据"""
+        key = self.key_generator.generate_key("industry", "data")
+        ttl = ttl or self.expiry_strategy.get_ttl("industry")
+        return self.set(key, data, ttl)
 
     def cache_industry_stocks(self, industry: str, stocks: list[str], ttl: int = None) -> bool:
         """缓存行业成分股"""
@@ -256,8 +284,5 @@ def get_cache() -> DataCache:
     if _cache_instance is None:
         config = get_config()
         redis_config = config.redis.model_dump() if config.redis.enabled else None
-        _cache_instance = DataCache(
-            redis_enabled=config.redis.enabled,
-            redis_config=redis_config
-        )
+        _cache_instance = DataCache(redis_enabled=config.redis.enabled, redis_config=redis_config)
     return _cache_instance

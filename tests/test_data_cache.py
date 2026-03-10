@@ -1,4 +1,5 @@
 """数据缓存模块测试"""
+
 from stock_explorer.data.cache import DataCache, get_cache
 from stock_explorer.utils.cache_utils import CacheExpiryStrategy, CacheKeyGenerator
 
@@ -31,6 +32,7 @@ class TestDataCache:
     def test_cache_expiry(self):
         """测试缓存过期"""
         import time
+
         cache = DataCache(redis_enabled=False)
         key = "test_expiry"
         value = "test_value"

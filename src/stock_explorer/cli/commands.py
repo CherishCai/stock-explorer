@@ -128,7 +128,7 @@ def monitor_hs300(
     strategy_list = strategies.split(",")
 
     for i in range(count):
-        console.print(f"\n[cyan]第 {i+1} 次扫描[/cyan]")
+        console.print(f"\n[cyan]第 {i + 1} 次扫描[/cyan]")
 
         # 获取 HS300 成分股列表
         hs300_list = scanner._get_hs300_list()
@@ -145,6 +145,7 @@ def monitor_hs300(
 
         if i < count - 1:
             import time
+
             time.sleep(interval)
 
 
@@ -165,7 +166,7 @@ def monitor_all(
     strategy_list = strategies.split(",")
 
     for i in range(count):
-        console.print(f"\n[cyan]第 {i+1} 次扫描[/cyan]")
+        console.print(f"\n[cyan]第 {i + 1} 次扫描[/cyan]")
 
         # 获取全市场股票列表
         market_stocks = scanner._get_market_stocks()
@@ -182,6 +183,7 @@ def monitor_all(
 
         if i < count - 1:
             import time
+
             time.sleep(interval)
 
 
@@ -203,7 +205,7 @@ def monitor_industry(
     strategy_list = strategies.split(",")
 
     for i in range(count):
-        console.print(f"\n[cyan]第 {i+1} 次扫描[/cyan]")
+        console.print(f"\n[cyan]第 {i + 1} 次扫描[/cyan]")
 
         # 获取行业成分股
         constituents = scanner.fetcher.fetch_stock_board_industry_cons(industry)
@@ -220,6 +222,7 @@ def monitor_industry(
 
         if i < count - 1:
             import time
+
             time.sleep(interval)
 
 
@@ -244,8 +247,16 @@ def list_strategies():
 
 
 @app.command("data-hs300")
-def data_hs300():
+def data_hs300(clear_cache: bool = typer.Option(False, "--clear-cache", help="清空沪深300成分股缓存")):
     """获取沪深300成分股"""
+    if clear_cache:
+        console.print("[bold]清空沪深300成分股缓存:[/bold]")
+        cache = get_cache()
+        key = cache.key_generator.generate_key("hs300", "list")
+        cache.invalidate(key)
+        console.print("[green]✅ 沪深300成分股缓存已清空[/green]")
+        return
+
     console.print("[bold]沪深300成分股:[/bold]")
 
     scanner = get_scanner()
@@ -277,27 +288,38 @@ def data_hs300():
 def data_industry(
     detail: bool = typer.Option(False, "--detail", "-d", help="显示完整详细信息"),
     top: int = typer.Option(10, "--top", "-t", help="显示前 N 行详情（仅在 detail 模式下有效）"),
+    clear_cache: bool = typer.Option(False, "--clear-cache", help="清空行业数据缓存"),
 ):
     """获取行业列表"""
+    if clear_cache:
+        console.print("[bold]清空行业数据缓存:[/bold]")
+        cache = get_cache()
+        key_list = cache.key_generator.generate_key("industry", "list")
+        key_data = cache.key_generator.generate_key("industry", "data")
+        cache.invalidate(key_list)
+        cache.invalidate(key_data)
+        console.print("[green]✅ 行业数据缓存已清空[/green]")
+        return
+
     console.print("[bold]行业板块列表:[/bold]")
 
     scanner = get_scanner()
     cache = get_cache()
 
-    # 从远程获取
-    df = scanner.fetcher.fetch_industry_classification()
-
-    # 如果获取成功，保存到缓存
-    if not df.empty:
-        cache.set("industry_list", df.to_dict('records'), ttl=3600)  # 缓存 1 小时
+    # 尝试从缓存获取完整数据
+    cached_data = cache.get_industry_data()
+    if cached_data:
+        # 使用缓存的完整数据
+        df = pd.DataFrame(cached_data)
     else:
-        # 远程获取失败，尝试从缓存获取历史数据
-        cached_data = cache.get("industry_list")
-        if cached_data is not None:
-            console.print("[yellow]⚠️  使用缓存的历史数据（远程获取失败）[/yellow]")
-            df = pd.DataFrame(cached_data)
-        else:
-            console.print("[red]❌ 远程获取失败且无缓存数据[/red]")
+        # 从 scanner 获取行业列表（会触发数据获取和缓存）
+        industry_list = scanner.get_industry_list()
+        if not industry_list:
+            console.print("[red]❌ 未获取到行业数据[/red]")
+            return
+        # 再次尝试获取完整数据
+        cached_data = cache.get_industry_data()
+        df = pd.DataFrame(cached_data) if cached_data else pd.DataFrame({"板块名称": industry_list})
 
     if df.empty:
         console.print("[dim]未获取到行业数据[/dim]")
@@ -317,10 +339,22 @@ def data_industry(
         # 简洁模式：只显示关键列
         console.print("[dim]提示：使用 --detail 参数查看完整数据[/dim]\n")
 
-        table = Table(show_header=True, show_lines=True, row_styles=["", "dim"], collapse_padding=True)
+        table = Table(
+            show_header=True, show_lines=True, row_styles=["", "dim"], collapse_padding=True
+        )
 
         # 简洁模式只显示关键列
-        key_columns = ["排名", "板块名称", "板块代码", "最新价", "涨跌幅", "换手率", "总市值", "领涨股票", "领涨股票-涨跌幅"]
+        key_columns = [
+            "排名",
+            "板块名称",
+            "板块代码",
+            "最新价",
+            "涨跌幅",
+            "换手率",
+            "总市值",
+            "领涨股票",
+            "领涨股票-涨跌幅",
+        ]
         column_configs = {
             "排名": {"justify": "right", "width": 5},
             "板块名称": {"style": "green", "width": 20, "no_wrap": True, "overflow": "ellipsis"},
@@ -330,7 +364,7 @@ def data_industry(
             "换手率": {"justify": "right", "width": 8, "no_wrap": True},
             "总市值": {"justify": "right", "width": 12, "no_wrap": True},
             "领涨股票": {"style": "cyan", "width": 10, "no_wrap": True, "overflow": "ellipsis"},
-            "领涨股票 - 涨跌幅": {"justify": "right", "width": 14, "no_wrap": True},
+            "领涨股票-涨跌幅": {"justify": "right", "width": 14, "no_wrap": True},
         }
 
         for col in key_columns:
@@ -363,6 +397,7 @@ def data_industry(
 
         console.print(table)
         console.print(f"\n[dim]共 {len(df)} 个行业板块[/dim]")
+
 
 
 @app.command("list-signals")
@@ -422,14 +457,19 @@ def daemon_start(
 
     console.print("[bold green]正在启动信号检测服务...[/bold green]")
     console.print(f"  HS300扫描: 启用 (间隔 {config.scan_interval_hs300}秒)")
-    console.print(f"  全市场扫描: {'启用' if config.enable_market_scan else '禁用'} (间隔 {config.scan_interval_market}秒)")
-    console.print(f"  行业扫描: {'启用' if config.enable_industry_scan else '禁用'} (间隔 {config.scan_interval_industry}秒)")
+    console.print(
+        f"  全市场扫描: {'启用' if config.enable_market_scan else '禁用'} (间隔 {config.scan_interval_market}秒)"
+    )
+    console.print(
+        f"  行业扫描: {'启用' if config.enable_industry_scan else '禁用'} (间隔 {config.scan_interval_industry}秒)"
+    )
 
     try:
         manager.start()
         console.print("[bold green]服务已启动，按 Ctrl+C 停止[/bold green]")
 
         import time
+
         try:
             while manager.status.value == "running":
                 time.sleep(1)

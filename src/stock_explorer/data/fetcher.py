@@ -1,6 +1,4 @@
-"""数据获取模块 - 集成 akshare """
-
-
+"""数据获取模块 - 集成 akshare"""
 
 import akshare as ak
 import pandas as pd
@@ -13,7 +11,7 @@ logger = get_logger(__name__)
 
 
 class DataFetcher:
-    """数据获取器 - 集成 akshare """
+    """数据获取器 - 集成 akshare"""
 
     def __init__(self):
         self.ak = ak
@@ -61,7 +59,7 @@ class DataFetcher:
         start_date: str,
         end_date: str,
         period: str = "daily",
-        adjust: str = "qfq"
+        adjust: str = "qfq",
     ) -> pd.DataFrame | None:
         """获取历史K线数据"""
         try:
@@ -77,7 +75,7 @@ class DataFetcher:
                 period=period,
                 start_date=start_date,
                 end_date=end_date,
-                adjust=adjust
+                adjust=adjust,
             )
 
             if isinstance(df, pd.DataFrame) and not df.empty:
@@ -88,11 +86,7 @@ class DataFetcher:
             return None
 
     def fetch_minute_kline(
-        self,
-        symbol: str,
-        start_date: str,
-        end_date: str,
-        period: str = "1min"
+        self, symbol: str, start_date: str, end_date: str, period: str = "1min"
     ) -> pd.DataFrame | None:
         """获取分钟K线数据"""
         try:
@@ -107,7 +101,7 @@ class DataFetcher:
                 symbol=symbol,
                 period=period,
                 start_date=start_date,
-                end_date=end_date
+                end_date=end_date,
             )
 
             if isinstance(df, pd.DataFrame) and not df.empty:
@@ -122,11 +116,7 @@ class DataFetcher:
         try:
             # 标准化股票代码
             symbol = validate_stock_symbol(symbol)
-            df = self._fetch_data(
-                self.ak.stock_individual_fund_flow,
-                symbol=symbol,
-                market=market
-            )
+            df = self._fetch_data(self.ak.stock_individual_fund_flow, symbol=symbol, market=market)
             return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
         except DataFetchError:
             return pd.DataFrame()
@@ -144,10 +134,7 @@ class DataFetcher:
         try:
             # 格式化日期
             date = format_date(date)
-            df = self._fetch_data(
-                self.ak.stock_lhb_stock_em,
-                date=date
-            )
+            df = self._fetch_data(self.ak.stock_lhb_stock_em, date=date)
             return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
         except DataFetchError:
             return pd.DataFrame()
@@ -157,10 +144,7 @@ class DataFetcher:
         try:
             # 格式化日期
             date = format_date(date)
-            df = self._fetch_data(
-                self.ak.stock_lhb_summary_em,
-                date=date
-            )
+            df = self._fetch_data(self.ak.stock_lhb_summary_em, date=date)
             return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
         except DataFetchError:
             return pd.DataFrame()
@@ -170,10 +154,7 @@ class DataFetcher:
         try:
             # 格式化日期
             date = format_date(date)
-            df = self._fetch_data(
-                self.ak.stock_lhb_institution_detail_em,
-                date=date
-            )
+            df = self._fetch_data(self.ak.stock_lhb_institution_detail_em, date=date)
             return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
         except DataFetchError:
             return pd.DataFrame()
@@ -183,10 +164,7 @@ class DataFetcher:
         try:
             # 格式化日期
             date = format_date(date)
-            df = self._fetch_data(
-                self.ak.stock_margin_detail_em,
-                date=date
-            )
+            df = self._fetch_data(self.ak.stock_margin_detail_em, date=date)
             return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
         except DataFetchError:
             return pd.DataFrame()
@@ -196,10 +174,7 @@ class DataFetcher:
         try:
             # 标准化股票代码
             symbol = validate_stock_symbol(symbol)
-            df = self._fetch_data(
-                self.ak.stock_margin_underlying_sec_em,
-                symbol=symbol
-            )
+            df = self._fetch_data(self.ak.stock_margin_underlying_sec_em, symbol=symbol)
             return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
         except DataFetchError:
             return pd.DataFrame()
@@ -209,10 +184,7 @@ class DataFetcher:
         try:
             # 标准化股票代码
             symbol = validate_stock_symbol(symbol)
-            df = self._fetch_data(
-                self.ak.stock_holder_trade,
-                symbol=symbol
-            )
+            df = self._fetch_data(self.ak.stock_holder_trade, symbol=symbol)
             return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
         except DataFetchError:
             return pd.DataFrame()
@@ -222,10 +194,7 @@ class DataFetcher:
         try:
             # 标准化股票代码
             symbol = validate_stock_symbol(symbol)
-            df = self._fetch_data(
-                self.ak.stock_bid_ask_em,
-                symbol=symbol
-            )
+            df = self._fetch_data(self.ak.stock_bid_ask_em, symbol=symbol)
             return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
         except DataFetchError:
             return pd.DataFrame()
@@ -235,10 +204,7 @@ class DataFetcher:
         try:
             # 标准化股票代码
             symbol = validate_stock_symbol(symbol)
-            df = self._fetch_data(
-                self.ak.stock_individual_info_em,
-                symbol=symbol
-            )
+            df = self._fetch_data(self.ak.stock_individual_info_em, symbol=symbol)
             if isinstance(df, pd.DataFrame) and not df.empty:
                 return df.to_dict(orient="records")[0]
             logger.warning(f"未获取到 {symbol} 个股信息")
@@ -251,10 +217,7 @@ class DataFetcher:
         try:
             # 标准化股票代码
             symbol = validate_stock_symbol(symbol)
-            df = self._fetch_data(
-                self.ak.stock_financial_analysis_indicator,
-                symbol=symbol
-            )
+            df = self._fetch_data(self.ak.stock_financial_analysis_indicator, symbol=symbol)
             return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
         except DataFetchError:
             return pd.DataFrame()
@@ -262,10 +225,7 @@ class DataFetcher:
     def fetch_hs300_constituents(self) -> pd.DataFrame:
         """获取沪深300成分股"""
         try:
-            df = self._fetch_data(
-                self.ak.index_stock_cons_csindex,
-                symbol="000300"
-            )
+            df = self._fetch_data(self.ak.index_stock_cons_csindex, symbol="000300")
             return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
         except DataFetchError:
             return pd.DataFrame()
@@ -293,10 +253,7 @@ class DataFetcher:
             start = format_date(start)
             end = format_date(end)
             df = self._fetch_data(
-                self.ak.stock_board_industry_hist_em,
-                board=industry,
-                start_date=start,
-                end_date=end
+                self.ak.stock_board_industry_hist_em, board=industry, start_date=start, end_date=end
             )
             if isinstance(df, pd.DataFrame) and not df.empty:
                 # 标准化K线数据格式
@@ -332,10 +289,7 @@ class DataFetcher:
     def fetch_stock_board_industry_cons(self, industry: str) -> pd.DataFrame:
         """获取行业成分股"""
         try:
-            df = self._fetch_data(
-                self.ak.stock_board_industry_cons_em,
-                symbol=industry
-            )
+            df = self._fetch_data(self.ak.stock_board_industry_cons_em, symbol=industry)
             return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
         except DataFetchError:
             return pd.DataFrame()

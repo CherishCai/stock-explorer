@@ -93,10 +93,10 @@ class BaseSignalDetector(SignalDetector, ABC):
             增强后的信号对象
         """
         # 添加工夫信息
-        if 'name' in data and not signal.name:
-            signal.name = data['name']
-        if 'price' in data and not signal.price:
-            signal.price = data['price']
+        if "name" in data and not signal.name:
+            signal.name = data["name"]
+        if "price" in data and not signal.price:
+            signal.price = data["price"]
         return signal
 
 
@@ -112,7 +112,7 @@ class KlineBasedDetector(BaseSignalDetector, ABC):
         Returns:
             是否有效
         """
-        kline = data.get('kline')
+        kline = data.get("kline")
         return kline is not None and len(kline) > 0
 
     def _process_data(self, data: dict) -> dict[str, Any]:
@@ -124,37 +124,32 @@ class KlineBasedDetector(BaseSignalDetector, ABC):
         Returns:
             处理后的数据
         """
-        kline = data.get('kline')
+        kline = data.get("kline")
         df = pd.DataFrame(kline)
 
         # 标准化列名
         column_mapping = {
-            '日期': 'date',
-            '开盘': 'open',
-            '最高': 'high',
-            '最低': 'low',
-            '收盘': 'close',
-            '成交量': 'volume',
-            '成交额': 'amount'
+            "日期": "date",
+            "开盘": "open",
+            "最高": "high",
+            "最低": "low",
+            "收盘": "close",
+            "成交量": "volume",
+            "成交额": "amount",
         }
         for old_col, new_col in column_mapping.items():
             if old_col in df.columns:
                 df = df.rename(columns={old_col: new_col})
 
         # 确保日期列是datetime类型
-        if 'date' in df.columns:
-            df['date'] = pd.to_datetime(df['date'])
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"])
 
         # 排序
-        if 'date' in df.columns:
-            df = df.sort_values('date')
+        if "date" in df.columns:
+            df = df.sort_values("date")
 
-        return {
-            'df': df,
-            'symbol': data.get('symbol', ''),
-            'name': data.get('name', ''),
-            **data
-        }
+        return {"df": df, "symbol": data.get("symbol", ""), "name": data.get("name", ""), **data}
 
 
 class QuoteBasedDetector(BaseSignalDetector, ABC):
@@ -169,7 +164,7 @@ class QuoteBasedDetector(BaseSignalDetector, ABC):
         Returns:
             是否有效
         """
-        quote = data.get('quote')
+        quote = data.get("quote")
         return quote is not None and isinstance(quote, dict)
 
     def _process_data(self, data: dict) -> dict[str, Any]:
@@ -181,13 +176,13 @@ class QuoteBasedDetector(BaseSignalDetector, ABC):
         Returns:
             处理后的数据
         """
-        quote = data.get('quote')
+        quote = data.get("quote")
         return {
-            'quote': quote,
-            'symbol': data.get('symbol', ''),
-            'name': data.get('name', ''),
-            'price': quote.get('最新价', quote.get('price', 0)),
-            **data
+            "quote": quote,
+            "symbol": data.get("symbol", ""),
+            "name": data.get("name", ""),
+            "price": quote.get("最新价", quote.get("price", 0)),
+            **data,
         }
 
 
@@ -211,16 +206,12 @@ class SignalCombiner:
         strength_score = 0
         direction_score = 0
 
-        strength_map = {
-            SignalStrength.WEAK: 1,
-            SignalStrength.MEDIUM: 2,
-            SignalStrength.STRONG: 3
-        }
+        strength_map = {SignalStrength.WEAK: 1, SignalStrength.MEDIUM: 2, SignalStrength.STRONG: 3}
 
         direction_map = {
             SignalDirection.BUY: 1,
             SignalDirection.SELL: -1,
-            SignalDirection.NEUTRAL: 0
+            SignalDirection.NEUTRAL: 0,
         }
 
         for signal in signals:
@@ -255,9 +246,9 @@ class SignalCombiner:
             price=first_signal.price,
             message=f"组合信号: {len(signals)}个信号",
             metadata={
-                'signal_count': len(signals),
-                'individual_signals': [signal.to_dict() for signal in signals]
-            }
+                "signal_count": len(signals),
+                "individual_signals": [signal.to_dict() for signal in signals],
+            },
         )
 
         return combined_signal

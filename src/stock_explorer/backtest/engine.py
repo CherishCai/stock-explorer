@@ -1,4 +1,5 @@
 """回测引擎 - 集成 akquant"""
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -104,6 +105,7 @@ class BacktestEngine:
         self.data_storage = None
         try:
             from stock_explorer.data.storage import get_storage
+
             self.data_storage = get_storage()
         except Exception as e:
             logger.warning(f"Failed to initialize data storage: {e}")
@@ -117,12 +119,10 @@ class BacktestEngine:
         self.equity_history: list[dict] = []
         self._current_time: datetime | None = None
         # 清除数据缓存
-        if hasattr(self, '_data_cache'):
+        if hasattr(self, "_data_cache"):
             self._data_cache.clear()
 
-    def calculate_commission(
-        self, price: float, quantity: int, direction: PositionSide
-    ) -> float:
+    def calculate_commission(self, price: float, quantity: int, direction: PositionSide) -> float:
         turnover = price * quantity
         commission = turnover * self.commission_rate
         commission = max(commission, 5.0)
@@ -150,7 +150,9 @@ class BacktestEngine:
         total_cost = execution_price * quantity + commission
 
         if total_cost > self.capital:
-            logger.warning(f"资金不足，无法开仓 {symbol}: 需要的资金 {total_cost}, 可用资金 {self.capital}")
+            logger.warning(
+                f"资金不足，无法开仓 {symbol}: 需要的资金 {total_cost}, 可用资金 {self.capital}"
+            )
             return False
 
         self.capital -= total_cost
@@ -160,9 +162,8 @@ class BacktestEngine:
             total_quantity = existing.quantity + quantity
             if existing.direction == direction:
                 avg_price = (
-                    (existing.entry_price * existing.quantity + execution_price * quantity)
-                    / total_quantity
-                )
+                    existing.entry_price * existing.quantity + execution_price * quantity
+                ) / total_quantity
                 existing.entry_price = avg_price
                 existing.quantity = total_quantity
                 existing.entry_time = timestamp
@@ -206,12 +207,12 @@ class BacktestEngine:
             )
         )
 
-        logger.info(f"开仓 {symbol} {'多' if direction == PositionSide.LONG else '空'} @ {execution_price:.2f} x {quantity}")
+        logger.info(
+            f"开仓 {symbol} {'多' if direction == PositionSide.LONG else '空'} @ {execution_price:.2f} x {quantity}"
+        )
         return True
 
-    def close_position(
-        self, symbol: str, quantity: int, price: float, timestamp: datetime
-    ) -> bool:
+    def close_position(self, symbol: str, quantity: int, price: float, timestamp: datetime) -> bool:
         if symbol not in self.positions:
             logger.warning(f"尝试平仓不存在的持仓 {symbol}")
             return False
@@ -220,8 +221,12 @@ class BacktestEngine:
         close_quantity = min(quantity, position.quantity)
 
         slippage = self.calculate_slippage(price, position.direction)
-        execution_price = price - slippage if position.direction == PositionSide.LONG else price + slippage
-        commission = self.calculate_commission(price=execution_price, quantity=close_quantity, direction=position.direction)
+        execution_price = (
+            price - slippage if position.direction == PositionSide.LONG else price + slippage
+        )
+        commission = self.calculate_commission(
+            price=execution_price, quantity=close_quantity, direction=position.direction
+        )
 
         pnl = (
             (execution_price - position.entry_price) * close_quantity
@@ -240,7 +245,9 @@ class BacktestEngine:
             Trade(
                 timestamp=timestamp,
                 symbol=symbol,
-                direction=PositionSide.SHORT if position.direction == PositionSide.LONG else PositionSide.LONG,
+                direction=PositionSide.SHORT
+                if position.direction == PositionSide.LONG
+                else PositionSide.LONG,
                 price=execution_price,
                 quantity=close_quantity,
                 commission=commission,
@@ -250,8 +257,6 @@ class BacktestEngine:
 
         logger.info(f"平仓 {symbol} @ {execution_price:.2f} x {close_quantity}, 盈亏: {pnl:.2f}")
         return True
-
-
 
     def update_positions(self, prices: dict[str, float], timestamp: datetime):
         for symbol, position in self.positions.items():
@@ -307,7 +312,7 @@ class BacktestEngine:
                     start_date=start_date,
                     end_date=end_date,
                     period=interval,
-                    adjust=adjust
+                    adjust=adjust,
                 )
                 if df is not None and not df.empty:
                     kline_data[symbol] = df
@@ -322,23 +327,25 @@ class BacktestEngine:
                 akquant_data = {}
                 for symbol, df in kline_data.items():
                     # 转换为 akquant 所需的格式
-                    akquant_df = df.rename(columns={
-                        "日期": "date",
-                        "开盘": "open",
-                        "最高": "high",
-                        "最低": "low",
-                        "收盘": "close",
-                        "成交量": "volume",
-                        "成交额": "amount"
-                    })
-                    akquant_df['date'] = pd.to_datetime(akquant_df['date'])
+                    akquant_df = df.rename(
+                        columns={
+                            "日期": "date",
+                            "开盘": "open",
+                            "最高": "high",
+                            "最低": "low",
+                            "收盘": "close",
+                            "成交量": "volume",
+                            "成交额": "amount",
+                        }
+                    )
+                    akquant_df["date"] = pd.to_datetime(akquant_df["date"])
                     akquant_data[symbol] = akquant_df
 
                 # 初始化 akquant 回测引擎
                 backtest = akquant.Backtest(
                     initial_capital=self.initial_capital,
                     commission_rate=self.commission_rate,
-                    slippage_rate=self.slippage_rate
+                    slippage_rate=self.slippage_rate,
                 )
 
                 # 添加数据到回测引擎
@@ -365,7 +372,7 @@ class BacktestEngine:
                     annual_volatility=result.annual_volatility,
                     trades=[],  # 转换 akquant 交易记录
                     equity_curve=result.equity_curve,
-                    monthly_returns=result.monthly_returns
+                    monthly_returns=result.monthly_returns,
                 )
             except Exception as e:
                 logger.error(f"akquant 回测失败: {e}")
@@ -426,6 +433,7 @@ class BacktestEngine:
 
         # 并行获取数据
         import concurrent.futures
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             # 提交所有数据获取任务
             future_to_symbol = {}
@@ -436,7 +444,7 @@ class BacktestEngine:
                     start_date=start_date,
                     end_date=end_date,
                     period=mapped_period,
-                    adjust=adjust
+                    adjust=adjust,
                 )
                 future_to_symbol[future] = symbol
 
@@ -448,8 +456,8 @@ class BacktestEngine:
                     if df is not None and not df.empty:
                         kline_data[symbol] = df
                         # 确定日期列和收盘价列
-                        date_column_map[symbol] = 'date' if 'date' in df.columns else '日期'
-                        close_column_map[symbol] = 'close' if 'close' in df.columns else '收盘'
+                        date_column_map[symbol] = "date" if "date" in df.columns else "日期"
+                        close_column_map[symbol] = "close" if "close" in df.columns else "收盘"
                 except Exception as e:
                     logger.error(f"获取 {symbol} 数据失败: {e}")
 
@@ -502,30 +510,22 @@ class BacktestEngine:
         return signals
 
     def _get_kline_data(
-        self,
-        symbol: str,
-        start_date: str,
-        end_date: str,
-        period: str,
-        adjust: str
+        self, symbol: str, start_date: str, end_date: str, period: str, adjust: str
     ) -> pd.DataFrame | None:
         """获取K线数据，优先使用数据库，不足部分从akshare补充"""
         # 缓存键，用于缓存数据获取结果
         cache_key = f"{symbol}_{period}_{start_date}_{end_date}"
-        if hasattr(self, '_data_cache') and cache_key in self._data_cache:
+        if hasattr(self, "_data_cache") and cache_key in self._data_cache:
             return self._data_cache[cache_key]
 
         result = None
         if self.data_storage:
             db_data = self.data_storage.get_kline(
-                symbol=symbol,
-                start=start_date,
-                end=end_date,
-                period=period
+                symbol=symbol, start=start_date, end=end_date, period=period
             )
             if not db_data.empty:
                 # 检查数据库数据是否完整覆盖时间范围
-                date_col = 'date' if 'date' in db_data.columns else '日期'
+                date_col = "date" if "date" in db_data.columns else "日期"
                 db_dates = db_data[date_col].tolist()
                 db_dates = sorted(db_dates)
                 if db_dates and db_dates[0] <= start_date and db_dates[-1] >= end_date:
@@ -553,17 +553,21 @@ class BacktestEngine:
                     # 合并数据
                     if missing_data is not None and not missing_data.empty:
                         # 确保列名一致
-                        if 'date' in missing_data.columns and date_col == '日期':
-                            missing_data = missing_data.rename(columns={'date': '日期'})
-                        elif '日期' in missing_data.columns and date_col == 'date':
-                            missing_data = missing_data.rename(columns={'日期': 'date'})
+                        if "date" in missing_data.columns and date_col == "日期":
+                            missing_data = missing_data.rename(columns={"date": "日期"})
+                        elif "日期" in missing_data.columns and date_col == "date":
+                            missing_data = missing_data.rename(columns={"日期": "date"})
 
                         # 合并数据并去重
-                        combined_data = pd.concat([db_data, missing_data]).drop_duplicates(subset=[date_col])
+                        combined_data = pd.concat([db_data, missing_data]).drop_duplicates(
+                            subset=[date_col]
+                        )
                         # 按日期排序
                         combined_data = combined_data.sort_values(by=date_col)
 
-                        logger.info(f"从数据库和 akshare 合并获取 {symbol} 数据 {len(combined_data)} 条")
+                        logger.info(
+                            f"从数据库和 akshare 合并获取 {symbol} 数据 {len(combined_data)} 条"
+                        )
 
                         # 保存合并后的数据到数据库
                         try:
@@ -592,7 +596,7 @@ class BacktestEngine:
                 result = df
 
         # 缓存结果
-        if not hasattr(self, '_data_cache'):
+        if not hasattr(self, "_data_cache"):
             self._data_cache = {}
         self._data_cache[cache_key] = result
         return result
@@ -657,7 +661,9 @@ class BacktestEngine:
 
                     # 计算年化收益率和波动率
                     if len(equity_df) > 0:
-                        annual_return = (final_capital / self.initial_capital) ** (252 / len(equity_df)) - 1
+                        annual_return = (final_capital / self.initial_capital) ** (
+                            252 / len(equity_df)
+                        ) - 1
                     annual_volatility = returns.std() * np.sqrt(252) * 100
 
         return BacktestResult(

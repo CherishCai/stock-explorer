@@ -51,7 +51,7 @@ class DataStorage:
             cursor = conn.cursor()
 
             # K线数据表
-            cursor.execute('''
+            cursor.execute("""
             CREATE TABLE IF NOT EXISTS kline_data (
                 id INTEGER PRIMARY KEY,
                 symbol TEXT NOT NULL,
@@ -66,10 +66,10 @@ class DataStorage:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(symbol, date, period)
             )
-            ''')
+            """)
 
             # 信号记录表
-            cursor.execute('''
+            cursor.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id INTEGER PRIMARY KEY,
                 timestamp TIMESTAMP NOT NULL,
@@ -83,10 +83,10 @@ class DataStorage:
                 metadata TEXT,  -- JSON
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            ''')
+            """)
 
             # 告警记录表
-            cursor.execute('''
+            cursor.execute("""
             CREATE TABLE IF NOT EXISTS alerts (
                 id INTEGER PRIMARY KEY,
                 signal_id INTEGER,
@@ -98,10 +98,10 @@ class DataStorage:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(signal_id) REFERENCES signals(id)
             )
-            ''')
+            """)
 
             # 监控配置表
-            cursor.execute('''
+            cursor.execute("""
             CREATE TABLE IF NOT EXISTS watchlist (
                 id INTEGER PRIMARY KEY,
                 symbol TEXT NOT NULL,
@@ -110,7 +110,7 @@ class DataStorage:
                 enabled BOOLEAN DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            ''')
+            """)
 
             conn.commit()
             logger.info(f"数据库初始化完成: {self.db_path}")
@@ -118,7 +118,7 @@ class DataStorage:
             logger.error(f"数据库初始化失败: {e}")
             raise DataStorageError(f"数据库初始化失败: {e}") from e
         finally:
-            if 'conn' in locals():
+            if "conn" in locals():
                 self._close_connection(conn)
 
     def save_kline(self, df: pd.DataFrame, symbol: str, period: str):
@@ -135,24 +135,31 @@ class DataStorage:
             cursor = conn.cursor()
 
             # 使用事务批量插入
-            cursor.execute('BEGIN TRANSACTION')
+            cursor.execute("BEGIN TRANSACTION")
 
             for _, row in df.iterrows():
                 # 处理时间戳类型
-                date_value = row.get('date', row.get('日期'))
-                if hasattr(date_value, 'strftime'):
-                    date_value = date_value.strftime('%Y-%m-%d')
+                date_value = row.get("date", row.get("日期"))
+                if hasattr(date_value, "strftime"):
+                    date_value = date_value.strftime("%Y-%m-%d")
 
                 cursor.execute(
-                    '''
+                    """
                     INSERT OR REPLACE INTO kline_data
                     (symbol, date, open, high, low, close, volume, amount, period)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''',
-                    (symbol, date_value, row.get('open', row.get('开盘')),
-                     row.get('high', row.get('最高')), row.get('low', row.get('最低')),
-                     row.get('close', row.get('收盘')), row.get('volume', row.get('成交量')),
-                     row.get('amount', row.get('成交额')), period)
+                    """,
+                    (
+                        symbol,
+                        date_value,
+                        row.get("open", row.get("开盘")),
+                        row.get("high", row.get("最高")),
+                        row.get("low", row.get("最低")),
+                        row.get("close", row.get("收盘")),
+                        row.get("volume", row.get("成交量")),
+                        row.get("amount", row.get("成交额")),
+                        period,
+                    ),
                 )
 
             conn.commit()
@@ -171,11 +178,11 @@ class DataStorage:
         conn = None
         try:
             conn = self._get_connection()
-            query = '''
+            query = """
             SELECT * FROM kline_data
             WHERE symbol = ? AND period = ? AND date >= ? AND date <= ?
             ORDER BY date
-            '''
+            """
             df = pd.read_sql_query(query, conn, params=(symbol, period, start, end))
             logger.info(f"获取 {symbol} {period} K线数据 {len(df)} 条")
             return df
@@ -197,23 +204,31 @@ class DataStorage:
             cursor = conn.cursor()
 
             # 使用事务批量插入
-            cursor.execute('BEGIN TRANSACTION')
+            cursor.execute("BEGIN TRANSACTION")
 
             for signal in signals:
                 # 处理时间戳类型
-                timestamp = signal.get('timestamp')
-                if hasattr(timestamp, 'strftime'):
-                    timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                timestamp = signal.get("timestamp")
+                if hasattr(timestamp, "strftime"):
+                    timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
                 cursor.execute(
-                    '''
+                    """
                     INSERT INTO signals
                     (timestamp, symbol, name, signal_type, direction, strength, price, message, metadata)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''',
-                    (timestamp, signal.get('symbol'), signal.get('name'),
-                     signal.get('signal_type'), signal.get('direction'), signal.get('strength'),
-                     signal.get('price'), signal.get('message'), json.dumps(signal.get('metadata', {})))
+                    """,
+                    (
+                        timestamp,
+                        signal.get("symbol"),
+                        signal.get("name"),
+                        signal.get("signal_type"),
+                        signal.get("direction"),
+                        signal.get("strength"),
+                        signal.get("price"),
+                        signal.get("message"),
+                        json.dumps(signal.get("metadata", {})),
+                    ),
                 )
 
             conn.commit()
@@ -227,32 +242,34 @@ class DataStorage:
             if conn:
                 self._close_connection(conn)
 
-    def get_signals(self, start_date: str, end_date: str, filters: dict = None, limit: int = None) -> pd.DataFrame:
+    def get_signals(
+        self, start_date: str, end_date: str, filters: dict = None, limit: int = None
+    ) -> pd.DataFrame:
         """获取信号记录"""
         conn = None
         try:
             conn = self._get_connection()
-            query = '''
+            query = """
             SELECT * FROM signals
             WHERE timestamp >= ? AND timestamp <= ?
-            '''
+            """
             params = [start_date, end_date]
 
             if filters:
-                if filters.get('symbol'):
-                    query += ' AND symbol = ?'
-                    params.append(filters['symbol'])
-                if filters.get('signal_type'):
-                    query += ' AND signal_type = ?'
-                    params.append(filters['signal_type'])
-                if filters.get('direction'):
-                    query += ' AND direction = ?'
-                    params.append(filters['direction'])
+                if filters.get("symbol"):
+                    query += " AND symbol = ?"
+                    params.append(filters["symbol"])
+                if filters.get("signal_type"):
+                    query += " AND signal_type = ?"
+                    params.append(filters["signal_type"])
+                if filters.get("direction"):
+                    query += " AND direction = ?"
+                    params.append(filters["direction"])
 
-            query += ' ORDER BY timestamp DESC'
+            query += " ORDER BY timestamp DESC"
 
             if limit:
-                query += f' LIMIT {limit}'
+                query += f" LIMIT {limit}"
 
             df = pd.read_sql_query(query, conn, params=params)
             logger.info(f"获取信号记录 {len(df)} 条")
@@ -272,18 +289,24 @@ class DataStorage:
             cursor = conn.cursor()
 
             # 处理时间戳类型
-            timestamp = alert.get('timestamp')
-            if hasattr(timestamp, 'strftime'):
-                timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            timestamp = alert.get("timestamp")
+            if hasattr(timestamp, "strftime"):
+                timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
             cursor.execute(
-                '''
+                """
                 INSERT INTO alerts
                 (signal_id, timestamp, channel, status, message, response)
                 VALUES (?, ?, ?, ?, ?, ?)
-                ''',
-                (alert.get('signal_id'), timestamp, alert.get('channel'),
-                 alert.get('status'), alert.get('message'), alert.get('response'))
+                """,
+                (
+                    alert.get("signal_id"),
+                    timestamp,
+                    alert.get("channel"),
+                    alert.get("status"),
+                    alert.get("message"),
+                    alert.get("response"),
+                ),
             )
             conn.commit()
             logger.info("保存告警记录")
@@ -301,17 +324,17 @@ class DataStorage:
         conn = None
         try:
             conn = self._get_connection()
-            query = '''
+            query = """
             SELECT * FROM alerts
             WHERE timestamp >= ? AND timestamp <= ?
-            '''
+            """
             params = [start, end]
 
             if channel:
-                query += ' AND channel = ?'
+                query += " AND channel = ?"
                 params.append(channel)
 
-            query += ' ORDER BY timestamp DESC'
+            query += " ORDER BY timestamp DESC"
 
             df = pd.read_sql_query(query, conn, params=params)
             logger.info(f"获取告警记录 {len(df)} 条")
@@ -334,17 +357,21 @@ class DataStorage:
             cursor = conn.cursor()
 
             # 使用事务批量插入
-            cursor.execute('BEGIN TRANSACTION')
+            cursor.execute("BEGIN TRANSACTION")
 
             for item in symbols:
                 cursor.execute(
-                    '''
+                    """
                     INSERT OR REPLACE INTO watchlist
                     (symbol, name, category, enabled)
                     VALUES (?, ?, ?, ?)
-                    ''',
-                    (item.get('symbol'), item.get('name'), item.get('category'),
-                     item.get('enabled', 1))
+                    """,
+                    (
+                        item.get("symbol"),
+                        item.get("name"),
+                        item.get("category"),
+                        item.get("enabled", 1),
+                    ),
                 )
 
             conn.commit()
@@ -363,11 +390,11 @@ class DataStorage:
         conn = None
         try:
             conn = self._get_connection()
-            query = 'SELECT * FROM watchlist WHERE enabled = 1'
+            query = "SELECT * FROM watchlist WHERE enabled = 1"
             params = []
 
             if category:
-                query += ' AND category = ?'
+                query += " AND category = ?"
                 params.append(category)
 
             cursor = conn.cursor()
@@ -376,14 +403,16 @@ class DataStorage:
 
             result = []
             for row in rows:
-                result.append({
-                    'id': row[0],
-                    'symbol': row[1],
-                    'name': row[2],
-                    'category': row[3],
-                    'enabled': row[4],
-                    'created_at': row[5]
-                })
+                result.append(
+                    {
+                        "id": row[0],
+                        "symbol": row[1],
+                        "name": row[2],
+                        "category": row[3],
+                        "enabled": row[4],
+                        "created_at": row[5],
+                    }
+                )
 
             logger.info(f"获取监控列表 {len(result)} 条")
             return result
@@ -401,7 +430,7 @@ class DataStorage:
             conn = self._get_connection()
             cursor = conn.cursor()
 
-            cursor.execute(f'DELETE FROM {table_name}')
+            cursor.execute(f"DELETE FROM {table_name}")
             conn.commit()
             logger.info(f"清空表 {table_name}")
         except Exception as e:
@@ -418,7 +447,7 @@ class DataStorage:
         conn = None
         try:
             conn = self._get_connection()
-            conn.execute('VACUUM')
+            conn.execute("VACUUM")
             conn.commit()
             logger.info("数据库优化完成")
         except Exception as e:

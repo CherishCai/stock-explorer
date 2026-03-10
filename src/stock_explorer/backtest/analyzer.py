@@ -1,4 +1,5 @@
 """回测绩效分析器"""
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -49,7 +50,12 @@ class PerformanceAnalyzer:
         total_return = (equity_curve["total_value"].iloc[-1] / self.initial_capital - 1) * 100
 
         days = len(equity_curve)
-        annual_return = ((equity_curve["total_value"].iloc[-1] / self.initial_capital) ** (252 / days) - 1) * 100 if days > 0 else 0
+        annual_return = (
+            ((equity_curve["total_value"].iloc[-1] / self.initial_capital) ** (252 / days) - 1)
+            * 100
+            if days > 0
+            else 0
+        )
 
         volatility = returns.std() * np.sqrt(252) * 100 if len(returns) > 0 else 0
 
@@ -70,15 +76,27 @@ class PerformanceAnalyzer:
 
         win_rate = (len(winning_trades) / len(trades) * 100) if len(trades) > 0 else 0
 
-        total_wins = sum(getattr(t, "quantity", 0) * getattr(t, "price", 0) * 0.1 for t in winning_trades)
-        total_losses = sum(abs(getattr(t, "quantity", 0) * getattr(t, "price", 0) * 0.1) for t in losing_trades)
+        total_wins = sum(
+            getattr(t, "quantity", 0) * getattr(t, "price", 0) * 0.1 for t in winning_trades
+        )
+        total_losses = sum(
+            abs(getattr(t, "quantity", 0) * getattr(t, "price", 0) * 0.1) for t in losing_trades
+        )
         profit_factor = total_wins / total_losses if total_losses > 0 else 0
 
         avg_win = total_wins / len(winning_trades) if winning_trades else 0
         avg_loss = total_losses / len(losing_trades) if losing_trades else 0
 
-        largest_win = max(getattr(t, "price", 0) * getattr(t, "quantity", 0) for t in winning_trades) if winning_trades else 0
-        largest_loss = min(getattr(t, "price", 0) * getattr(t, "quantity", 0) for t in losing_trades) if losing_trades else 0
+        largest_win = (
+            max(getattr(t, "price", 0) * getattr(t, "quantity", 0) for t in winning_trades)
+            if winning_trades
+            else 0
+        )
+        largest_loss = (
+            min(getattr(t, "price", 0) * getattr(t, "quantity", 0) for t in losing_trades)
+            if losing_trades
+            else 0
+        )
 
         avg_holding_days = 5.0
 
@@ -121,9 +139,9 @@ class PerformanceAnalyzer:
 
     def generate_report(self, metrics: PerformanceMetrics) -> str:
         report = f"""
-{'='*50}
+{"=" * 50}
                     回测绩效报告
-{'='*50}
+{"=" * 50}
 
 初始资金:          {self.initial_capital:,.2f} 元
 
@@ -150,7 +168,7 @@ class PerformanceAnalyzer:
 最大单笔亏损:     {metrics.largest_loss:,.2f} 元
 平均持仓天数:     {metrics.avg_holding_days:.1f} 天
 
-{'='*50}
+{"=" * 50}
 """
         return report
 

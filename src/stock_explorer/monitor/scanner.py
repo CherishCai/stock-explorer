@@ -98,9 +98,12 @@ class MarketScanner:
         if show_top > 0 and stock_data_list:
             from rich.console import Console
             from rich.table import Table
+
             console = Console()
 
-            console.print(f"\n[cyan]扫描的股票示例（前 {min(show_top, len(stock_data_list))} 只）:[/cyan]")
+            console.print(
+                f"\n[cyan]扫描的股票示例（前 {min(show_top, len(stock_data_list))} 只）:[/cyan]"
+            )
             table = Table(show_header=True, show_lines=True, row_styles=["", "dim"])
             table.add_column("代码", style="yellow", width=8)
             table.add_column("名称", style="green", width=12)
@@ -113,10 +116,12 @@ class MarketScanner:
                 code = str(stock_data.get("symbol", ""))
                 name = str(stock_data.get("name", ""))
                 quote = stock_data.get("quote", {})
-                price = f"{quote.get('最新价', 0):.2f}" if '最新价' in quote else "N/A"
-                change_pct = f"{quote.get('涨跌幅', 0):.2f}%" if '涨跌幅' in quote else "N/A"
-                volume = f"{int(quote.get('成交量', 0)):,}" if '成交量' in quote else "N/A"
-                amount = f"{float(quote.get('成交额', 0)/10000):.2f}万" if '成交额' in quote else "N/A"
+                price = f"{quote.get('最新价', 0):.2f}" if "最新价" in quote else "N/A"
+                change_pct = f"{quote.get('涨跌幅', 0):.2f}%" if "涨跌幅" in quote else "N/A"
+                volume = f"{int(quote.get('成交量', 0)):,}" if "成交量" in quote else "N/A"
+                amount = (
+                    f"{float(quote.get('成交额', 0) / 10000):.2f}万" if "成交额" in quote else "N/A"
+                )
                 table.add_row(code, name, price, change_pct, volume, amount)
 
             console.print(table)
@@ -197,9 +202,12 @@ class MarketScanner:
         if show_top > 0 and stock_data_list:
             from rich.console import Console
             from rich.table import Table
+
             console = Console()
 
-            console.print(f"\n[cyan]扫描的股票示例（前 {min(show_top, len(stock_data_list))} 只）:[/cyan]")
+            console.print(
+                f"\n[cyan]扫描的股票示例（前 {min(show_top, len(stock_data_list))} 只）:[/cyan]"
+            )
             table = Table(show_header=True, show_lines=True, row_styles=["", "dim"])
             table.add_column("代码", style="yellow", width=8)
             table.add_column("名称", style="green", width=12)
@@ -212,10 +220,12 @@ class MarketScanner:
                 code = str(stock_data.get("symbol", ""))
                 name = str(stock_data.get("name", ""))
                 quote = stock_data.get("quote", {})
-                price = f"{quote.get('最新价', 0):.2f}" if '最新价' in quote else "N/A"
-                change_pct = f"{quote.get('涨跌幅', 0):.2f}%" if '涨跌幅' in quote else "N/A"
-                volume = f"{int(quote.get('成交量', 0)):,}" if '成交量' in quote else "N/A"
-                amount = f"{float(quote.get('成交额', 0)/10000):.2f}万" if '成交额' in quote else "N/A"
+                price = f"{quote.get('最新价', 0):.2f}" if "最新价" in quote else "N/A"
+                change_pct = f"{quote.get('涨跌幅', 0):.2f}%" if "涨跌幅" in quote else "N/A"
+                volume = f"{int(quote.get('成交量', 0)):,}" if "成交量" in quote else "N/A"
+                amount = (
+                    f"{float(quote.get('成交额', 0) / 10000):.2f}万" if "成交额" in quote else "N/A"
+                )
                 table.add_row(code, name, price, change_pct, volume, amount)
 
             console.print(table)
@@ -242,7 +252,9 @@ class MarketScanner:
         logger.info(f"Market scan completed: {len(signals)} signals found")
         return signals
 
-    def scan_industry(self, industry: str, strategy_names: list[str], show_top: int = 0) -> list[Signal]:
+    def scan_industry(
+        self, industry: str, strategy_names: list[str], show_top: int = 0
+    ) -> list[Signal]:
         """扫描特定行业
 
         扫描指定行业的股票，检测指定策略的信号
@@ -312,8 +324,21 @@ class MarketScanner:
 
     def get_industry_list(self) -> list[str]:
         """获取行业列表"""
+        # 尝试从缓存获取完整数据
+        cached_data = self.cache.get_industry_data()
+        if cached_data:
+            # 从缓存数据中提取行业名称列表
+            logger.info("从缓存获取行业列表数据")
+            return [item.get("板块名称", "") for item in cached_data if item.get("板块名称")]
+
+        # 从远程接口获取
         df = self.fetcher.fetch_industry_classification()
         if df is not None and not df.empty:
+            # 缓存完整数据
+            full_data = df.to_dict("records")
+            self.cache.cache_industry_data(full_data)
+            logger.info("从远程接口获取行业列表数据并缓存")
+            # 返回行业名称列表
             return df["板块名称"].tolist() if "板块名称" in df.columns else []
         return []
 
@@ -321,6 +346,7 @@ class MarketScanner:
         """获取沪深300成分股列表"""
         cached = self.cache.get_hs300_list()
         if cached:
+            logger.info("从缓存获取沪深300成分股数据")
             return cached
 
         df = self.fetcher.fetch_hs300_constituents()
@@ -328,13 +354,16 @@ class MarketScanner:
             return []
 
         result = df.to_dict("records")
-        self.cache.cache_hs300_list(result, ttl=3600)
+        # 使用默认的TTL，不再硬编码
+        self.cache.cache_hs300_list(result)
+        logger.info("从远程接口获取沪深300成分股数据并缓存")
         return result
 
     def _get_market_stocks(self) -> list[dict]:
         """获取全市场股票列表"""
         cached = self.cache.get_market_stocks()
         if cached:
+            logger.info("从缓存获取全市场股票列表数据")
             return cached
 
         df = self.fetcher.fetch_stock_list()
@@ -342,7 +371,9 @@ class MarketScanner:
             return []
 
         result = df.to_dict("records")
-        self.cache.cache_market_stocks(result, ttl=3600)
+        # 使用默认的TTL，不再硬编码
+        self.cache.cache_market_stocks(result)
+        logger.info("从远程接口获取全市场股票列表数据并缓存")
         return result
 
 

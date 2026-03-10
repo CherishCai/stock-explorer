@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 class SignalType(StrEnum):
     """信号类型枚举"""
+
     TECHNICAL = "technical"
     CAPITAL_FLOW = "capital_flow"
     MARGIN = "margin"
@@ -20,6 +21,7 @@ class SignalType(StrEnum):
 
 class SignalDirection(StrEnum):
     """信号方向"""
+
     BUY = "buy"
     SELL = "sell"
     NEUTRAL = "neutral"
@@ -27,6 +29,7 @@ class SignalDirection(StrEnum):
 
 class SignalStrength(StrEnum):
     """信号强度"""
+
     STRONG = "strong"
     MEDIUM = "medium"
     WEAK = "weak"
@@ -34,6 +37,7 @@ class SignalStrength(StrEnum):
 
 class Signal(BaseModel):
     """信号数据模型"""
+
     timestamp: datetime = Field(default_factory=datetime.now)
     symbol: str
     name: str = ""

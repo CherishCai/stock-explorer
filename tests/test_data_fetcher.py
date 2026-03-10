@@ -1,4 +1,5 @@
 """数据获取器测试"""
+
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -25,11 +26,13 @@ class TestDataFetcher:
 
     @patch("akshare.stock_zh_a_spot_em")
     def test_fetch_realtime_quotes_mock(self, mock_spot):
-        mock_spot.return_value = pd.DataFrame({
-            "代码": ["000001"],
-            "名称": ["平安银行"],
-            "最新价": [12.50],
-        })
+        mock_spot.return_value = pd.DataFrame(
+            {
+                "代码": ["000001"],
+                "名称": ["平安银行"],
+                "最新价": [12.50],
+            }
+        )
 
         fetcher = DataFetcher()
         result = fetcher.fetch_realtime_quotes()
@@ -39,14 +42,16 @@ class TestDataFetcher:
 
     @patch("akshare.stock_zh_a_hist")
     def test_fetch_historical_kline_mock(self, mock_hist):
-        mock_hist.return_value = pd.DataFrame({
-            "日期": ["2024-01-01", "2024-01-02"],
-            "开盘": [10.0, 10.5],
-            "收盘": [10.5, 11.0],
-            "最高": [11.0, 11.5],
-            "最低": [9.5, 10.0],
-            "成交量": [1000000, 1200000],
-        })
+        mock_hist.return_value = pd.DataFrame(
+            {
+                "日期": ["2024-01-01", "2024-01-02"],
+                "开盘": [10.0, 10.5],
+                "收盘": [10.5, 11.0],
+                "最高": [11.0, 11.5],
+                "最低": [9.5, 10.0],
+                "成交量": [1000000, 1200000],
+            }
+        )
 
         fetcher = DataFetcher()
         result = fetcher.fetch_historical_kline(
@@ -62,11 +67,13 @@ class TestDataFetcher:
 
     @patch("akshare.stock_individual_fund_flow")
     def test_fetch_individual_fund_flow_mock(self, mock_fund):
-        mock_fund.return_value = pd.DataFrame({
-            "日期": ["2024-01-01"],
-            "主力净流入": [1000000],
-            "散户净流入": [-500000],
-        })
+        mock_fund.return_value = pd.DataFrame(
+            {
+                "日期": ["2024-01-01"],
+                "主力净流入": [1000000],
+                "散户净流入": [-500000],
+            }
+        )
 
         fetcher = DataFetcher()
         result = fetcher.fetch_individual_fund_flow("000001", "主板")
@@ -75,10 +82,12 @@ class TestDataFetcher:
 
     @patch("akshare.index_stock_cons_csindex")
     def test_fetch_hs300_constituents_mock(self, mock_hs300):
-        mock_hs300.return_value = pd.DataFrame({
-            "代码": ["000001", "000002"],
-            "名称": ["平安银行", "万科A"],
-        })
+        mock_hs300.return_value = pd.DataFrame(
+            {
+                "代码": ["000001", "000002"],
+                "名称": ["平安银行", "万科A"],
+            }
+        )
 
         fetcher = DataFetcher()
         result = fetcher.fetch_hs300_constituents()

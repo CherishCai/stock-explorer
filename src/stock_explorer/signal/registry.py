@@ -1,6 +1,5 @@
 """信号注册表 - 管理所有信号检测器"""
 
-
 from stock_explorer.signal.base import SignalDetector, SignalType
 from stock_explorer.signal.detectors import (
     BreakoutDetector,
@@ -63,9 +62,7 @@ class SignalRegistry:
         """按类型列出检测器"""
         cls._initialize()
         return [
-            name
-            for name, detector in cls._detectors.items()
-            if detector.signal_type == signal_type
+            name for name, detector in cls._detectors.items() if detector.signal_type == signal_type
         ]
 
     @classmethod

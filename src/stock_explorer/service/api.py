@@ -132,7 +132,9 @@ async def get_signals(
                 query = "SELECT * FROM signals WHERE symbol = ? AND signal_type = ? ORDER BY created_at DESC LIMIT ?"
                 params = [symbol, signal_type, limit]
             else:
-                query = "SELECT * FROM signals WHERE signal_type = ? ORDER BY created_at DESC LIMIT ?"
+                query = (
+                    "SELECT * FROM signals WHERE signal_type = ? ORDER BY created_at DESC LIMIT ?"
+                )
                 params = [signal_type, limit]
 
         results = db.execute_query(query, params)
@@ -145,9 +147,7 @@ async def get_signals(
 async def get_signal(signal_id: int):
     db = Database()
     try:
-        results = db.execute_query(
-            "SELECT * FROM signals WHERE id = ?", [signal_id]
-        )
+        results = db.execute_query("SELECT * FROM signals WHERE id = ?", [signal_id])
         if not results:
             raise HTTPException(status_code=404, detail="信号不存在")
         return results[0]
@@ -201,10 +201,12 @@ async def list_strategies():
     strategies = []
     for name in registry.list_detectors():
         detector = registry.get_detector(name)
-        strategies.append({
-            "name": name,
-            "description": getattr(detector, "__doc__", "") or "",
-        })
+        strategies.append(
+            {
+                "name": name,
+                "description": getattr(detector, "__doc__", "") or "",
+            }
+        )
     return {"strategies": strategies}
 
 
@@ -215,15 +217,17 @@ async def get_scheduler_tasks():
 
     tasks = []
     for task in task_scheduler.list_tasks():
-        tasks.append({
-            "name": task.name,
-            "type": task.task_type.value,
-            "status": task.status.value,
-            "interval": task.interval,
-            "next_run": task.next_run.isoformat() if task.next_run else None,
-            "last_run": task.last_run.isoformat() if task.last_run else None,
-            "last_error": task.last_error,
-        })
+        tasks.append(
+            {
+                "name": task.name,
+                "type": task.task_type.value,
+                "status": task.status.value,
+                "interval": task.interval,
+                "next_run": task.next_run.isoformat() if task.next_run else None,
+                "last_run": task.last_run.isoformat() if task.last_run else None,
+                "last_error": task.last_error,
+            }
+        )
     return {"tasks": tasks}
 
 

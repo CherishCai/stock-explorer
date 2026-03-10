@@ -13,7 +13,7 @@ test_signal = Signal(
     strength=SignalStrength.STRONG,
     price=10.0,
     timestamp=datetime.now(),
-    message="测试信号"
+    message="测试信号",
 )
 
 # 获取配置并创建notifier

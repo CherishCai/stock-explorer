@@ -18,6 +18,7 @@ logger = get_logger(__name__)
 
 class ScanHS300Config(BaseModel):
     """沪深300扫描配置"""
+
     enabled: bool = True
     interval: int = 5
     strategies: list[str] = ["golden_cross", "capital_flow", "limit_up"]
@@ -25,6 +26,7 @@ class ScanHS300Config(BaseModel):
 
 class ScanMarketConfig(BaseModel):
     """全市场扫描配置"""
+
     enabled: bool = True
     interval: int = 30
     strategies: list[str] = ["limit_up", "volume_surge", "high_turnover"]
@@ -32,6 +34,7 @@ class ScanMarketConfig(BaseModel):
 
 class ScanIndustryConfig(BaseModel):
     """行业板块扫描配置"""
+
     enabled: bool = True
     interval: int = 30
     industries: list[str] = ["银行", "证券", "科技", "医药"]
@@ -39,6 +42,7 @@ class ScanIndustryConfig(BaseModel):
 
 class ScanConfig(BaseModel):
     """扫描配置"""
+
     hs300: ScanHS300Config = Field(default_factory=ScanHS300Config)
     market: ScanMarketConfig = Field(default_factory=ScanMarketConfig)
     industry: ScanIndustryConfig = Field(default_factory=ScanIndustryConfig)
@@ -46,6 +50,7 @@ class ScanConfig(BaseModel):
 
 class RedisConfig(BaseModel):
     """Redis配置"""
+
     enabled: bool = True
     host: str = "localhost"
     port: int = 6379
@@ -57,12 +62,14 @@ class RedisConfig(BaseModel):
 
 class SQLiteConfig(BaseModel):
     """SQLite配置"""
+
     enabled: bool = True
     path: str = "data/stock_explorer.db"
 
 
 class EmailConfig(BaseModel):
     """邮件告警配置"""
+
     enabled: bool = False
     smtp_host: str = "smtp.example.com"
     smtp_port: int = 465
@@ -74,6 +81,7 @@ class EmailConfig(BaseModel):
 
 class DingTalkConfig(BaseModel):
     """钉钉告警配置"""
+
     enabled: bool = False
     webhook_url: str = ""
     secret: str = ""
@@ -81,6 +89,7 @@ class DingTalkConfig(BaseModel):
 
 class AlertConfig(BaseModel):
     """告警配置"""
+
     console: bool = True
     file: bool = True
     file_path: str = "logs/signals.log"
@@ -94,6 +103,7 @@ class AlertConfig(BaseModel):
 
 class APIConfig(BaseModel):
     """API服务配置"""
+
     enabled: bool = False
     host: str = "0.0.0.0"
     port: int = 8000
@@ -101,6 +111,7 @@ class APIConfig(BaseModel):
 
 class AppConfig(BaseModel):
     """全局配置"""
+
     scan: ScanConfig = Field(default_factory=ScanConfig)
     redis: RedisConfig = Field(default_factory=RedisConfig)
     sqlite: SQLiteConfig = Field(default_factory=SQLiteConfig)
