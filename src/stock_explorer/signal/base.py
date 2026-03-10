@@ -46,6 +46,7 @@ class Signal(BaseModel):
     strength: SignalStrength = SignalStrength.MEDIUM
     price: float | None = None
     message: str = ""
+    strategy: str = ""  # 策略名称
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -59,6 +60,7 @@ class Signal(BaseModel):
             "strength": self.strength.value,
             "price": self.price,
             "message": self.message,
+            "strategy": self.strategy,
             "metadata": self.metadata,
         }
 

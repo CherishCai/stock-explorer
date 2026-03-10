@@ -80,6 +80,7 @@ class DataStorage:
                 strength TEXT,              -- strong/medium/weak
                 price REAL,
                 message TEXT,
+                strategy TEXT,              -- 策略名称
                 metadata TEXT,  -- JSON
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -215,8 +216,8 @@ class DataStorage:
                 cursor.execute(
                     """
                     INSERT INTO signals
-                    (timestamp, symbol, name, signal_type, direction, strength, price, message, metadata)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (timestamp, symbol, name, signal_type, direction, strength, price, message, strategy, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         timestamp,
@@ -227,6 +228,7 @@ class DataStorage:
                         signal.get("strength"),
                         signal.get("price"),
                         signal.get("message"),
+                        signal.get("strategy", ""),
                         json.dumps(signal.get("metadata", {})),
                     ),
                 )

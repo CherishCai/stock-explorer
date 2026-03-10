@@ -425,6 +425,7 @@ def signals_list(
     table.add_column("股票", style="yellow")
     table.add_column("方向", style="green")
     table.add_column("信号", style="magenta")
+    table.add_column("策略", style="blue")
 
     for _, row in df.iterrows():
         table.add_row(
@@ -432,6 +433,7 @@ def signals_list(
             f"{row['symbol']} {row['name']}",
             row["direction"],
             row["signal_type"],
+            row["strategy"],
         )
 
     console.print(table)

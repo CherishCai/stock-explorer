@@ -97,6 +97,9 @@ class BaseSignalDetector(SignalDetector, ABC):
             signal.name = data["name"]
         if "price" in data and not signal.price:
             signal.price = data["price"]
+        # 添加策略名称
+        if not signal.strategy and hasattr(self, "name"):
+            signal.strategy = self.name
         return signal
 
 

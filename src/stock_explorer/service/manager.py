@@ -156,6 +156,7 @@ class ServiceManager:
                     "strength": signal.strength.value,
                     "price": signal.price,
                     "message": signal.message,
+                    "strategy": signal.strategy,
                     "metadata": {},
                 }
                 for signal in signals
@@ -383,6 +384,7 @@ class AsyncServiceManager:
                     "strength": signal.strength.value,
                     "price": signal.price,
                     "message": signal.message,
+                    "strategy": signal.strategy,
                     "metadata": {},
                 }
                 for signal in signals

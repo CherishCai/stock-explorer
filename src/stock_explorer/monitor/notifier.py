@@ -237,7 +237,7 @@ class NotifierManager:
 
     def _check_rate_limit(self, signal: Signal) -> bool:
         """检查频率限制"""
-        key = f"{signal.symbol}:{signal.signal_type.value}"
+        key = f"{signal.symbol}:{signal.strategy}"
         now = datetime.now()
 
         if key in self.alert_history:

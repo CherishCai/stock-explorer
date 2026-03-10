@@ -64,7 +64,7 @@ alert:
   min_strength: "medium"
   exclude_st: true
   min_market_cap: 10000000000
-  rate_limit_seconds: 60
+  rate_limit_seconds: 3600
 
 api:
   enabled: false
