@@ -309,8 +309,9 @@ class ServiceManager:
             logger.info("刷新行业列表数据...")
             df = self._fetcher.fetch_industry_classification()
             if not df.empty:
+                full_data = df.to_dict("records")
+                self._cache.cache_industry_data(full_data)
                 industry_list = df["板块名称"].tolist() if "板块名称" in df.columns else []
-                self._cache.cache_industry_list(industry_list)
                 logger.info(f"行业列表数据刷新成功，共 {len(industry_list)} 条")
             else:
                 logger.warning("行业列表数据获取失败")

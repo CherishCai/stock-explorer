@@ -116,7 +116,41 @@ class TaskScheduler:
         return list(self._tasks.values())
 
     def _parse_cron_next_run(self, cron_expr: str) -> datetime:
-        return datetime.now() + timedelta(minutes=1)
+        """解析cron表达式，计算下次执行时间
+        
+        支持的cron格式: 分 时 日 月 周
+        例如: "0 14 * * 3" 表示每周三14:00执行
+        """
+        now = datetime.now()
+        
+        # 解析cron表达式
+        parts = cron_expr.split()
+        if len(parts) != 5:
+            # 无效的cron表达式，返回默认值
+            logger.warning(f"无效的cron表达式: {cron_expr}，使用默认值")
+            return now + timedelta(days=7)
+        
+        minute, hour, day, month, weekday = parts
+        
+        # 解析目标时间
+        target_minute = int(minute) if minute != '*' else now.minute
+        target_hour = int(hour) if hour != '*' else now.hour
+        target_weekday = int(weekday) if weekday != '*' else now.weekday()
+        
+        # 计算下次执行时间
+        next_run = now
+        
+        # 调整到目标时间
+        next_run = next_run.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
+        
+        # 计算到下一个目标工作日的天数
+        days_until_target = (target_weekday - next_run.weekday() + 7) % 7
+        if days_until_target == 0 and next_run <= now:
+            days_until_target = 7  # 今天是目标工作日但已过时间，需要到下一周
+        
+        next_run += timedelta(days=days_until_target)
+        
+        return next_run
 
     def start(self):
         if self._running:
