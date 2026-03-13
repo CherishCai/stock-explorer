@@ -58,6 +58,8 @@ class RedisConfig(BaseModel):
     db: int = 0
     realtime_ttl: int = 10
     hs300_cache_ttl: int = 60
+    industry_cache_ttl: int = 1800
+    market_cache_ttl: int = 86400
 
 
 class SQLiteConfig(BaseModel):

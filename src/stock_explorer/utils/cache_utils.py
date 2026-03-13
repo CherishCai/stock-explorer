@@ -37,8 +37,15 @@ class CacheKeyGenerator:
 class CacheExpiryStrategy:
     """缓存过期策略"""
 
-    @staticmethod
-    def get_ttl(cache_type: str) -> int:
+    def __init__(self, config=None):
+        """初始化缓存过期策略
+
+        Args:
+            config: 配置对象
+        """
+        self.config = config
+
+    def get_ttl(self, cache_type: str) -> int:
         """根据缓存类型获取过期时间
 
         Args:
@@ -47,15 +54,28 @@ class CacheExpiryStrategy:
         Returns:
             过期时间（秒）
         """
+        # 默认值
         ttl_map = {
             "realtime": 10,  # 实时数据10秒
             "hs300": 2592000,  # 沪深300成分股30天
-            "industry": 2592000,  # 行业数据30天
+            "industry": 1800,  # 行业数据30分钟
             "market": 3600,  # 全市场股票列表1小时
             "kline": 86400,  # K线数据1天
             "signal": 60,  # 信号数据1分钟
             "default": 600,  # 默认10分钟
         }
+
+        # 从配置中读取
+        if self.config:
+            if cache_type == "realtime" and hasattr(self.config.redis, "realtime_ttl"):
+                return self.config.redis.realtime_ttl
+            elif cache_type == "hs300" and hasattr(self.config.redis, "hs300_cache_ttl"):
+                return self.config.redis.hs300_cache_ttl
+            elif cache_type == "industry" and hasattr(self.config.redis, "industry_cache_ttl"):
+                return self.config.redis.industry_cache_ttl
+            elif cache_type == "market" and hasattr(self.config.redis, "market_cache_ttl"):
+                return self.config.redis.market_cache_ttl
+
         return ttl_map.get(cache_type, ttl_map["default"])
 
 

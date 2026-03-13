@@ -36,6 +36,8 @@ redis:
   db: 0
   realtime_ttl: 10
   hs300_cache_ttl: 60
+  industry_cache_ttl: 1800
+  market_cache_ttl: 86400
 
 sqlite:
   enabled: true

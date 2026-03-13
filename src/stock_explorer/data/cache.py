@@ -40,7 +40,7 @@ class DataCache:
         self.cache_expiry = {}
         # 缓存工具
         self.key_generator = CacheKeyGenerator()
-        self.expiry_strategy = CacheExpiryStrategy()
+        self.expiry_strategy = CacheExpiryStrategy(config=get_config())
 
     def get(self, key: str) -> Any | None:
         """获取缓存数据"""
