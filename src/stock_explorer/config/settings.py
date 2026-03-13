@@ -37,6 +37,7 @@ class ScanIndustryConfig(BaseModel):
 
     enabled: bool = True
     interval: int = 30
+    strategies: list[str] = ["limit_up", "volume_surge"]
     industries: list[str] = ["银行", "证券", "科技", "医药"]
 
 
