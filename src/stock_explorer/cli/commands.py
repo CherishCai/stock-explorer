@@ -446,19 +446,26 @@ def daemon_start(
     """启动常驻服务"""
     from stock_explorer.service.manager import ServiceConfig, ServiceManager
 
+    # 从配置文件读取扫描间隔设置
+    config_obj = get_config()
+    
+    # 创建服务配置
     config = ServiceConfig(
-        scan_interval_hs300=5,
-        scan_interval_market=30,
-        scan_interval_industry=30,
-        enable_hs300_scan=True,
-        enable_market_scan=False,
-        enable_industry_scan=False,
+        scan_interval_hs300=config_obj.scan.hs300.interval,
+        scan_interval_market=config_obj.scan.market.interval,
+        scan_interval_industry=config_obj.scan.industry.interval,
+        enable_hs300_scan=config_obj.scan.hs300.enabled,
+        enable_market_scan=config_obj.scan.market.enabled,
+        enable_industry_scan=config_obj.scan.industry.enabled,
+        hs300_strategies=",".join(config_obj.scan.hs300.strategies),
+        market_strategies=",".join(config_obj.scan.market.strategies),
+        industry_strategies=",".join(config_obj.scan.industry.strategies),
     )
 
     manager = ServiceManager(config)
 
     console.print("[bold green]正在启动信号检测服务...[/bold green]")
-    console.print(f"  HS300扫描: 启用 (间隔 {config.scan_interval_hs300}秒)")
+    console.print(f"  HS300扫描: {'启用' if config.enable_hs300_scan else '禁用'} (间隔 {config.scan_interval_hs300}秒)")
     console.print(
         f"  全市场扫描: {'启用' if config.enable_market_scan else '禁用'} (间隔 {config.scan_interval_market}秒)"
     )

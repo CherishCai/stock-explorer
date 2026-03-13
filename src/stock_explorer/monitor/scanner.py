@@ -33,6 +33,9 @@ class MarketScanner:
         self.cache = get_cache()
         self.signal_registry = SignalRegistry()
         self.max_workers = 10  # 并行工作线程数
+        self._quotes_cache = None  # 实时行情数据缓存
+        self._quotes_timestamp = 0  # 缓存时间戳
+        self._quotes_ttl = 5  # 缓存有效期（秒）
 
     def _detect_signal(self, stock_data: dict[str, Any], detectors: list) -> list[Signal]:
         """检测单个股票的信号"""
@@ -46,6 +49,33 @@ class MarketScanner:
             except Exception as e:
                 logger.warning(f"Detection failed for {stock_data.get('symbol', '')}: {e}")
         return signals
+
+    def _get_realtime_quotes(self):
+        """获取实时行情数据，使用缓存机制
+
+        确保在缓存有效期内只调用一次 fetch_realtime_quotes() 接口
+
+        Returns:
+            DataFrame: 实时行情数据
+        """
+        import time
+        current_time = time.time()
+
+        # 检查缓存是否有效
+        if self._quotes_cache is not None and (current_time - self._quotes_timestamp) < self._quotes_ttl:
+            logger.info("使用缓存的实时行情数据")
+            return self._quotes_cache
+
+        # 缓存失效，重新获取数据
+        logger.info("从远程接口获取实时行情数据")
+        quotes = self.fetcher.fetch_realtime_quotes()
+        
+        # 更新缓存
+        if not quotes.empty:
+            self._quotes_cache = quotes
+            self._quotes_timestamp = current_time
+        
+        return quotes
 
     def scan_hs300(self, strategy_names: list[str], show_top: int = 0) -> list[Signal]:
         """扫描沪深300成分股
@@ -67,7 +97,7 @@ class MarketScanner:
 
         logger.info(f"Scanning {len(hs300_list)} HS300 stocks...")
 
-        quotes = self.fetcher.fetch_realtime_quotes()
+        quotes = self._get_realtime_quotes()
         if quotes.empty:
             logger.warning("Failed to fetch quotes")
             return signals
@@ -162,7 +192,7 @@ class MarketScanner:
         signals = []
 
         # 获取实时行情数据
-        quotes = self.fetcher.fetch_realtime_quotes()
+        quotes = self._get_realtime_quotes()
         if quotes.empty:
             logger.warning("Failed to fetch quotes")
             return signals
@@ -275,7 +305,7 @@ class MarketScanner:
 
         logger.info(f"Scanning {len(constituents)} stocks in {industry}...")
 
-        quotes = self.fetcher.fetch_realtime_quotes()
+        quotes = self._get_realtime_quotes()
         if quotes.empty:
             return signals
 

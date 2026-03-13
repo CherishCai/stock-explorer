@@ -2,15 +2,15 @@
 scan:
   hs300:
     enabled: true
-    interval: 5
+    interval: 300
     strategies:
       - golden_cross
       - capital_flow
       - limit_up
 
   market:
-    enabled: true
-    interval: 30
+    enabled: false
+    interval: 300
     strategies:
       - limit_up
       - volume_surge
@@ -18,7 +18,7 @@ scan:
 
   industry:
     enabled: true
-    interval: 30
+    interval: 300
     industries:
       - 银行
       - 证券
