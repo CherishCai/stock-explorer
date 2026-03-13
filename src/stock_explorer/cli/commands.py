@@ -448,7 +448,7 @@ def daemon_start(
 
     # 从配置文件读取扫描间隔设置
     config_obj = get_config()
-    
+
     # 创建服务配置
     config = ServiceConfig(
         scan_interval_hs300=config_obj.scan.hs300.interval,

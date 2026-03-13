@@ -69,12 +69,12 @@ class MarketScanner:
         # 缓存失效，重新获取数据
         logger.info("从远程接口获取实时行情数据")
         quotes = self.fetcher.fetch_realtime_quotes()
-        
+
         # 更新缓存
         if not quotes.empty:
             self._quotes_cache = quotes
             self._quotes_timestamp = current_time
-        
+
         return quotes
 
     def scan_hs300(self, strategy_names: list[str], show_top: int = 0) -> list[Signal]:
