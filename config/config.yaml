@@ -19,6 +19,9 @@ scan:
   industry:
     enabled: true
     interval: 300
+    strategies:
+      - limit_up
+      - volume_surge
     industries:
       - 银行
       - 证券
