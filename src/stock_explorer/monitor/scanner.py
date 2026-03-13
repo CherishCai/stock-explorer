@@ -35,7 +35,7 @@ class MarketScanner:
         self.max_workers = 10  # 并行工作线程数
         self._quotes_cache = None  # 实时行情数据缓存
         self._quotes_timestamp = 0  # 缓存时间戳
-        self._quotes_ttl = 5  # 缓存有效期（秒）
+        self._quotes_ttl = 60  # 缓存有效期（秒），增加到60秒以覆盖整个扫描周期
 
     def _detect_signal(self, stock_data: dict[str, Any], detectors: list) -> list[Signal]:
         """检测单个股票的信号"""
