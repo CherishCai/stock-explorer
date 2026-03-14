@@ -2,6 +2,7 @@
 
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, time
 from typing import Any
 
 from stock_explorer.data.cache import get_cache
@@ -29,6 +30,7 @@ class MarketScanner:
 
         初始化数据获取器、缓存和信号注册中心
         """
+        import threading
         self.fetcher = get_fetcher()
         self.cache = get_cache()
         self.signal_registry = SignalRegistry()
@@ -36,6 +38,40 @@ class MarketScanner:
         self._quotes_cache = None  # 实时行情数据缓存
         self._quotes_timestamp = 0  # 缓存时间戳
         self._quotes_ttl = 60  # 缓存有效期（秒），增加到60秒以覆盖整个扫描周期
+        self._quotes_lock = threading.Lock()  # 并发控制锁
+
+    def is_market_open(self) -> bool:
+        """检查当前时间是否在A股开盘时间内
+
+        A股开盘时间：
+        - 工作日（周一到周五）
+        - 上午：9:30 - 11:30
+        - 下午：13:00 - 15:00
+
+        Returns:
+            bool: 如果市场开盘返回True，否则返回False
+        """
+        now = datetime.now()
+        
+        # 检查是否是工作日（周一到周五）
+        if now.weekday() >= 5:  # 0=周一, 4=周五, 5=周六, 6=周日
+            return False
+        
+        current_time = now.time()
+        
+        # 检查是否在上午交易时间
+        morning_start = time(9, 30)
+        morning_end = time(11, 30)
+        if morning_start <= current_time <= morning_end:
+            return True
+        
+        # 检查是否在下午交易时间
+        afternoon_start = time(13, 0)
+        afternoon_end = time(15, 0)
+        if afternoon_start <= current_time <= afternoon_end:
+            return True
+        
+        return False
 
     def _detect_signal(self, stock_data: dict[str, Any], detectors: list) -> list[Signal]:
         """检测单个股票的信号"""
@@ -54,11 +90,20 @@ class MarketScanner:
         """获取实时行情数据，使用缓存机制
 
         确保在缓存有效期内只调用一次 fetch_realtime_quotes() 接口
+        支持并发控制，避免重复的远程请求
+        只在A股开盘时间获取实时行情
 
         Returns:
             DataFrame: 实时行情数据
         """
         import time
+        import pandas as pd
+        
+        # 检查市场是否开盘
+        if not self.is_market_open():
+            logger.info("市场未开盘，返回空数据")
+            return pd.DataFrame()
+
         current_time = time.time()
 
         # 检查缓存是否有效
@@ -66,14 +111,28 @@ class MarketScanner:
             logger.info("使用缓存的实时行情数据")
             return self._quotes_cache
 
-        # 缓存失效，重新获取数据
-        logger.info("从远程接口获取实时行情数据")
-        quotes = self.fetcher.fetch_realtime_quotes()
+        # 缓存失效，需要重新获取数据
+        # 使用锁确保同一时间只有一个线程发起远程请求
+        with self._quotes_lock:
+            # 再次检查市场是否开盘（防止在等待锁的过程中市场已收盘）
+            if not self.is_market_open():
+                logger.info("市场未开盘，返回空数据")
+                return pd.DataFrame()
+                
+            # 再次检查缓存（防止在等待锁的过程中其他线程已经更新了缓存）
+            current_time = time.time()
+            if self._quotes_cache is not None and (current_time - self._quotes_timestamp) < self._quotes_ttl:
+                logger.info("使用缓存的实时行情数据")
+                return self._quotes_cache
 
-        # 更新缓存
-        if not quotes.empty:
-            self._quotes_cache = quotes
-            self._quotes_timestamp = current_time
+            # 确实需要重新获取数据
+            logger.info("从远程接口获取实时行情数据")
+            quotes = self.fetcher.fetch_realtime_quotes()
+
+            # 更新缓存
+            if not quotes.empty:
+                self._quotes_cache = quotes
+                self._quotes_timestamp = current_time
 
         return quotes
 

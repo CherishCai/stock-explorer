@@ -9,6 +9,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
 
+from datetime import datetime, time
+
 from stock_explorer.config.settings import get_config
 from stock_explorer.data.cache import get_cache
 from stock_explorer.data.fetcher import get_fetcher
@@ -182,8 +184,15 @@ class ServiceManager:
         """通用扫描方法"""
         while not self._stop_event.is_set():
             try:
-                signals = scanner_func(strategies)
-                self._process_signals(signals)
+                # 检查市场是否开盘
+                if self.is_market_open():
+                    signals = scanner_func(strategies)
+                    self._process_signals(signals)
+                else:
+                    logger.info(f"市场未开盘，暂停{error_prefix}扫描")
+                    # 市场未开盘时，延长等待时间，减少资源消耗
+                    self._stop_event.wait(60)  # 等待60秒后再次检查
+                    continue
             except Exception as e:
                 logger.error(f"{error_prefix} 扫描出错: {e}")
 
@@ -213,20 +222,43 @@ class ServiceManager:
         """运行行业扫描"""
         while not self._stop_event.is_set():
             try:
-                logger.debug("执行行业扫描...")
-                strategies = self.config.industry_strategies.split(",")
-                industry_list = self._scanner.get_industry_list()
-                all_signals = []
+                # 检查市场是否开盘
+                if self.is_market_open():
+                    logger.debug("执行行业扫描...")
+                    strategies = self.config.industry_strategies.split(",")
+                    industry_list = self._scanner.get_industry_list()
+                    all_signals = []
 
-                # 扫描所有行业
-                for industry in industry_list[:10]:  # 限制扫描前10个行业，避免过多请求
-                    try:
-                        industry_signals = self._scanner.scan_industry(industry, strategies)
-                        all_signals.extend(industry_signals)
-                    except Exception as e:
-                        logger.error(f"行业 {industry} 扫描出错: {e}")
+                    # 并行扫描所有行业
+                    if industry_list and self._thread_pool:
+                        futures = []
+                        # 限制扫描前10个行业，避免过多请求
+                        for industry in industry_list[:10]:
+                            future = self._thread_pool.submit(self._scanner.scan_industry, industry, strategies)
+                            futures.append((future, industry))
 
-                self._process_signals(all_signals)
+                        # 收集结果
+                        for future, industry in futures:
+                            try:
+                                industry_signals = future.result()
+                                all_signals.extend(industry_signals)
+                            except Exception as e:
+                                logger.error(f"行业 {industry} 扫描出错: {e}")
+                    else:
+                        # 后备方案：串行扫描
+                        for industry in industry_list[:10]:
+                            try:
+                                industry_signals = self._scanner.scan_industry(industry, strategies)
+                                all_signals.extend(industry_signals)
+                            except Exception as e:
+                                logger.error(f"行业 {industry} 扫描出错: {e}")
+
+                    self._process_signals(all_signals)
+                else:
+                    logger.info("市场未开盘，暂停行业扫描")
+                    # 市场未开盘时，延长等待时间，减少资源消耗
+                    self._stop_event.wait(60)  # 等待60秒后再次检查
+                    continue
             except Exception as e:
                 logger.error(f"行业扫描出错: {e}")
 
@@ -283,6 +315,39 @@ class ServiceManager:
             "market_enabled": self.config.enable_market_scan,
             "industry_enabled": self.config.enable_industry_scan,
         }
+
+    def is_market_open(self) -> bool:
+        """检查当前时间是否在A股开盘时间内
+
+        A股开盘时间：
+        - 工作日（周一到周五）
+        - 上午：9:30 - 11:30
+        - 下午：13:00 - 15:00
+
+        Returns:
+            bool: 如果市场开盘返回True，否则返回False
+        """
+        now = datetime.now()
+        
+        # 检查是否是工作日（周一到周五）
+        if now.weekday() >= 5:  # 0=周一, 4=周五, 5=周六, 6=周日
+            return False
+        
+        current_time = now.time()
+        
+        # 检查是否在上午交易时间
+        morning_start = time(9, 30)
+        morning_end = time(11, 30)
+        if morning_start <= current_time <= morning_end:
+            return True
+        
+        # 检查是否在下午交易时间
+        afternoon_start = time(13, 0)
+        afternoon_end = time(15, 0)
+        if afternoon_start <= current_time <= afternoon_end:
+            return True
+        
+        return False
 
     def _refresh_cache_data(self):
         """刷新缓存数据
@@ -403,13 +468,53 @@ class AsyncServiceManager:
             if tasks:
                 await asyncio.gather(*tasks, return_exceptions=True)
 
+    async def is_market_open(self) -> bool:
+        """检查当前时间是否在A股开盘时间内
+
+        A股开盘时间：
+        - 工作日（周一到周五）
+        - 上午：9:30 - 11:30
+        - 下午：13:00 - 15:00
+
+        Returns:
+            bool: 如果市场开盘返回True，否则返回False
+        """
+        now = datetime.now()
+        
+        # 检查是否是工作日（周一到周五）
+        if now.weekday() >= 5:  # 0=周一, 4=周五, 5=周六, 6=周日
+            return False
+        
+        current_time = now.time()
+        
+        # 检查是否在上午交易时间
+        morning_start = time(9, 30)
+        morning_end = time(11, 30)
+        if morning_start <= current_time <= morning_end:
+            return True
+        
+        # 检查是否在下午交易时间
+        afternoon_start = time(13, 0)
+        afternoon_end = time(15, 0)
+        if afternoon_start <= current_time <= afternoon_end:
+            return True
+        
+        return False
+
     async def _run_scanner(self, scanner_func, strategies, interval, error_prefix):
         """通用扫描方法"""
         while self.status == ServiceStatus.RUNNING:
             try:
-                async with self._semaphore:
-                    signals = await asyncio.to_thread(scanner_func, strategies)
-                    await self._process_signals(signals)
+                # 检查市场是否开盘
+                if self.is_market_open():
+                    async with self._semaphore:
+                        signals = await asyncio.to_thread(scanner_func, strategies)
+                        await self._process_signals(signals)
+                else:
+                    logger.info(f"市场未开盘，暂停{error_prefix}扫描")
+                    # 市场未开盘时，延长等待时间，减少资源消耗
+                    await asyncio.sleep(60)  # 等待60秒后再次检查
+                    continue
             except Exception as e:
                 logger.error(f"{error_prefix} 扫描出错: {e}")
 
@@ -439,23 +544,30 @@ class AsyncServiceManager:
         """运行行业扫描"""
         while self.status == ServiceStatus.RUNNING:
             try:
-                strategies = self.config.industry_strategies.split(",")
-                industry_list = await asyncio.to_thread(self._scanner.get_industry_list)
-                all_signals = []
+                # 检查市场是否开盘
+                if self.is_market_open():
+                    strategies = self.config.industry_strategies.split(",")
+                    industry_list = await asyncio.to_thread(self._scanner.get_industry_list)
+                    all_signals = []
 
-                # 扫描所有行业
-                for industry in industry_list[:10]:  # 限制扫描前10个行业，避免过多请求
-                    try:
-                        # 使用信号量控制并发
-                        async with self._semaphore:
-                            industry_signals = await asyncio.to_thread(
-                                self._scanner.scan_industry, industry, strategies
-                            )
-                            all_signals.extend(industry_signals)
-                    except Exception as e:
-                        logger.error(f"行业 {industry} 扫描出错: {e}")
+                    # 扫描所有行业
+                    for industry in industry_list[:10]:  # 限制扫描前10个行业，避免过多请求
+                        try:
+                            # 使用信号量控制并发
+                            async with self._semaphore:
+                                industry_signals = await asyncio.to_thread(
+                                    self._scanner.scan_industry, industry, strategies
+                                )
+                                all_signals.extend(industry_signals)
+                        except Exception as e:
+                            logger.error(f"行业 {industry} 扫描出错: {e}")
 
-                await self._process_signals(all_signals)
+                    await self._process_signals(all_signals)
+                else:
+                    logger.info("市场未开盘，暂停行业扫描")
+                    # 市场未开盘时，延长等待时间，减少资源消耗
+                    await asyncio.sleep(60)  # 等待60秒后再次检查
+                    continue
             except Exception as e:
                 logger.error(f"行业扫描出错: {e}")
 
