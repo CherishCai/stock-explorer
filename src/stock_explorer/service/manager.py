@@ -327,6 +327,14 @@ class ServiceManager:
         Returns:
             bool: 如果市场开盘返回True，否则返回False
         """
+        from stock_explorer.config.settings import get_config
+        
+        # 检查配置是否设置了忽略市场开盘时间
+        config = get_config()
+        if config.ignore_market_hours:
+            logger.info("忽略市场开盘时间检查")
+            return True
+        
         now = datetime.now()
         
         # 检查是否是工作日（周一到周五）
@@ -479,6 +487,14 @@ class AsyncServiceManager:
         Returns:
             bool: 如果市场开盘返回True，否则返回False
         """
+        from stock_explorer.config.settings import get_config
+        
+        # 检查配置是否设置了忽略市场开盘时间
+        config = get_config()
+        if config.ignore_market_hours:
+            logger.info("忽略市场开盘时间检查")
+            return True
+        
         now = datetime.now()
         
         # 检查是否是工作日（周一到周五）

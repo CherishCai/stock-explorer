@@ -120,6 +120,7 @@ class AppConfig(BaseModel):
     sqlite: SQLiteConfig = Field(default_factory=SQLiteConfig)
     alert: AlertConfig = Field(default_factory=AlertConfig)
     api: APIConfig = Field(default_factory=APIConfig)
+    ignore_market_hours: bool = False  # 是否忽略市场开盘时间检查，用于开发环境
 
 
 class ConfigFileHandler(FileSystemEventHandler):
