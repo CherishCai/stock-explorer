@@ -190,8 +190,8 @@ class ServiceManager:
                     self._process_signals(signals)
                 else:
                     logger.info(f"市场未开盘，暂停{error_prefix}扫描")
-                    # 市场未开盘时，延长等待时间，减少资源消耗
-                    self._stop_event.wait(60)  # 等待60秒后再次检查
+                    # 市场未开盘时，使用配置的扫描间隔
+                    self._stop_event.wait(interval)  # 等待配置的扫描间隔后再次检查
                     continue
             except Exception as e:
                 logger.error(f"{error_prefix} 扫描出错: {e}")
@@ -258,8 +258,10 @@ class ServiceManager:
                     self._process_signals(all_signals)
                 else:
                     logger.info("市场未开盘，暂停行业扫描")
-                    # 市场未开盘时，延长等待时间，减少资源消耗
-                    self._stop_event.wait(60)  # 等待60秒后再次检查
+                    # 市场未开盘时，使用配置的扫描间隔
+                    self._stop_event.wait(
+                        self.config.scan_interval_industry
+                    )  # 等待配置的扫描间隔后再次检查
                     continue
             except Exception as e:
                 logger.error(f"行业扫描出错: {e}")
@@ -526,8 +528,8 @@ class AsyncServiceManager:
                         await self._process_signals(signals)
                 else:
                     logger.info(f"市场未开盘，暂停{error_prefix}扫描")
-                    # 市场未开盘时，延长等待时间，减少资源消耗
-                    await asyncio.sleep(60)  # 等待60秒后再次检查
+                    # 市场未开盘时，使用配置的扫描间隔
+                    await asyncio.sleep(interval)  # 等待配置的扫描间隔后再次检查
                     continue
             except Exception as e:
                 logger.error(f"{error_prefix} 扫描出错: {e}")
@@ -579,8 +581,10 @@ class AsyncServiceManager:
                     await self._process_signals(all_signals)
                 else:
                     logger.info("市场未开盘，暂停行业扫描")
-                    # 市场未开盘时，延长等待时间，减少资源消耗
-                    await asyncio.sleep(60)  # 等待60秒后再次检查
+                    # 市场未开盘时，使用配置的扫描间隔
+                    await asyncio.sleep(
+                        self.config.scan_interval_industry
+                    )  # 等待配置的扫描间隔后再次检查
                     continue
             except Exception as e:
                 logger.error(f"行业扫描出错: {e}")
