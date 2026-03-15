@@ -77,9 +77,10 @@ class ServiceManager:
         logger.info("正在启动信号检测服务...")
 
         try:
-            get_config()
+            config = get_config()
             self._scanner = MarketScanner()
-            self._notifier = NotifierManager()
+            from stock_explorer.monitor.notifier import create_notifier_manager
+            self._notifier = create_notifier_manager(config.alert.model_dump())
 
             # 初始化线程池
             self._thread_pool = ThreadPoolExecutor(max_workers=5)
@@ -414,9 +415,10 @@ class AsyncServiceManager:
         logger.info("正在启动异步信号检测服务...")
 
         try:
-            get_config()
+            config = get_config()
             self._scanner = MarketScanner()
-            self._notifier = NotifierManager()
+            from stock_explorer.monitor.notifier import create_notifier_manager
+            self._notifier = create_notifier_manager(config.alert.model_dump())
             # 初始化信号量，控制并发数
             self._semaphore = asyncio.Semaphore(5)
 

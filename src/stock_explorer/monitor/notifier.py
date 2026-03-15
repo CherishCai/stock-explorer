@@ -43,6 +43,7 @@ class ConsoleNotifier(AlertChannelBase):
         table.add_column("方向", style="green" if signal.direction.value == "buy" else "red")
         table.add_column("股票", style="yellow")
         table.add_column("信号")
+        table.add_column("策略")
         table.add_column("强度")
 
         table.add_row(
@@ -50,6 +51,7 @@ class ConsoleNotifier(AlertChannelBase):
             signal.direction.value.upper(),
             f"{signal.symbol} {signal.name}",
             signal.signal_type.value,
+            signal.strategy,
             signal.strength.value,
         )
 
@@ -73,7 +75,7 @@ class FileNotifier(AlertChannelBase):
         return (
             f"[{signal.timestamp.isoformat()}] "
             f"{signal.direction.value.upper()} - {signal.symbol} {signal.name} | "
-            f"{signal.signal_type.value} | {signal.strength.value} | {signal.message}"
+            f"{signal.signal_type.value} | {signal.strategy} | {signal.strength.value} | {signal.message}"
         )
 
     def send(self, message: str, signal: Signal) -> bool:
@@ -113,6 +115,7 @@ class EmailNotifier(AlertChannelBase):
             <table>
                 <tr><td><b>股票:</b></td><td>{signal.symbol} {signal.name}</td></tr>
                 <tr><td><b>信号:</b></td><td>{signal.signal_type.value}</td></tr>
+                <tr><td><b>策略:</b></td><td>{signal.strategy}</td></tr>
                 <tr><td><b>方向:</b></td><td>{signal.direction.value.upper()}</td></tr>
                 <tr><td><b>强度:</b></td><td>{signal.strength.value}</td></tr>
                 <tr><td><b>价格:</b></td><td>{signal.price}</td></tr>
@@ -162,6 +165,7 @@ class DingTalkNotifier(AlertChannelBase):
 
 > 股票: **{signal.symbol} {signal.name}**
 > 信号: {signal.signal_type.value}
+> 策略: {signal.strategy}
 > 强度: {signal.strength.value}
 > 价格: {signal.price}
 > 时间: {signal.timestamp}
