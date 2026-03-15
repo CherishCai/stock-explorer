@@ -1,3 +1,6 @@
+# 全局配置
+ignore_market_hours: false  # 是否忽略市场开盘时间检查，用于开发环境
+
 # 沪深300扫描配置
 scan:
   hs300:
@@ -53,13 +56,14 @@ alert:
 
   email:
     enabled: false
-    smtp_host: "smtp.example.com"
+    smtp_host: "smtp.qq.com"
     smtp_port: 465
-    smtp_user: "user@example.com"
-    smtp_password: "your_password"
-    from_addr: "stockbot@example.com"
+    smtp_user: "your_qq_email@qq.com"
+    smtp_password: "your_qq_authorization_code"
+    from_addr: "your_qq_email@qq.com"
     to_addrs:
       - "receiver1@example.com"
+      - "receiver2@example.com"
 
   dingtalk:
     enabled: false
