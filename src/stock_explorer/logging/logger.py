@@ -17,7 +17,7 @@ class Logger:
     def get_logger(
         cls,
         name: str,
-        log_file: str | None = None,
+        log_file: str | None = "logs/app.log",
         level: int = _default_level,
     ) -> logging.Logger:
         """获取日志记录器"""
@@ -31,7 +31,7 @@ class Logger:
 
         formatter = logging.Formatter(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d % %H:%M:%S",
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
 
         rich_handler = RichHandler(
@@ -80,4 +80,26 @@ def setup_logging(
     """设置全局日志"""
     Logger.set_level(level)
     if log_file:
+        # 确保创建主 logger
         Logger.get_logger("stock_explorer", log_file, level)
+
+        # 为所有已创建的 logger 添加文件处理器
+        for _name, logger in Logger._loggers.items():
+            if "RotatingFileHandler" not in [h.__class__.__name__ for h in logger.handlers]:
+                log_path = Path(log_file)
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+
+                formatter = logging.Formatter(
+                    "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                    datefmt="%Y-%m-%d %H:%M:%S",
+                )
+
+                file_handler = RotatingFileHandler(
+                    log_file,
+                    maxBytes=10 * 1024 * 1024,
+                    backupCount=5,
+                    encoding="utf-8",
+                )
+                file_handler.setLevel(level)
+                file_handler.setFormatter(formatter)
+                logger.addHandler(file_handler)
