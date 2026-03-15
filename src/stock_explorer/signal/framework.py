@@ -184,7 +184,7 @@ class QuoteBasedDetector(BaseSignalDetector, ABC):
             "quote": quote,
             "symbol": data.get("symbol", ""),
             "name": data.get("name", ""),
-            "price": quote.get("最新价", quote.get("price", 0)),
+            "price": quote.get("最新价", quote.get("price", 0)) if quote else 0,
             **data,
         }
 

@@ -3,8 +3,8 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
-import akquant
 import numpy as np
 import pandas as pd
 
@@ -12,6 +12,15 @@ from stock_explorer.data.fetcher import DataFetcher
 from stock_explorer.exceptions import BacktestError
 from stock_explorer.logging.logger import get_logger
 from stock_explorer.signal.registry import SignalRegistry
+
+# 尝试导入 akquant 模块
+try:
+    import akquant as akquant_module
+except ImportError:
+    akquant_module = None
+
+# 定义 akquant 变量
+akquant: Any | None = akquant_module
 
 logger = get_logger(__name__)
 
@@ -110,6 +119,7 @@ class BacktestEngine:
         except Exception as e:
             logger.warning(f"Failed to initialize data storage: {e}")
         self.signal_registry = SignalRegistry()
+        self._data_cache: dict = {}
         self._reset()
 
     def _reset(self):
@@ -119,8 +129,7 @@ class BacktestEngine:
         self.equity_history: list[dict] = []
         self._current_time: datetime | None = None
         # 清除数据缓存
-        if hasattr(self, "_data_cache"):
-            self._data_cache.clear()
+        self._data_cache.clear()
 
     def calculate_commission(self, price: float, quantity: int, direction: PositionSide) -> float:
         turnover = price * quantity
@@ -323,57 +332,64 @@ class BacktestEngine:
 
             # 集成 akquant 进行回测
             try:
-                # 准备 akquant 所需的数据格式
-                akquant_data = {}
-                for symbol, df in kline_data.items():
-                    # 转换为 akquant 所需的格式
-                    akquant_df = df.rename(
-                        columns={
-                            "日期": "date",
-                            "开盘": "open",
-                            "最高": "high",
-                            "最低": "low",
-                            "收盘": "close",
-                            "成交量": "volume",
-                            "成交额": "amount",
-                        }
+                if (
+                    akquant_module
+                    and hasattr(akquant_module, "backtest")
+                    and hasattr(akquant_module.backtest, "Backtest")
+                ):
+                    # 准备 akquant 所需的数据格式
+                    akquant_data = {}
+                    for symbol, df in kline_data.items():
+                        # 转换为 akquant 所需的格式
+                        akquant_df = df.rename(
+                            columns={
+                                "日期": "date",
+                                "开盘": "open",
+                                "最高": "high",
+                                "最低": "low",
+                                "收盘": "close",
+                                "成交量": "volume",
+                                "成交额": "amount",
+                            }
+                        )
+                        akquant_df["date"] = pd.to_datetime(akquant_df["date"])
+                        akquant_data[symbol] = akquant_df
+
+                    # 初始化 akquant 回测引擎
+                    backtest = akquant_module.backtest.Backtest(
+                        initial_capital=self.initial_capital,
+                        commission_rate=self.commission_rate,
+                        slippage_rate=self.slippage_rate,
                     )
-                    akquant_df["date"] = pd.to_datetime(akquant_df["date"])
-                    akquant_data[symbol] = akquant_df
 
-                # 初始化 akquant 回测引擎
-                backtest = akquant.Backtest(
-                    initial_capital=self.initial_capital,
-                    commission_rate=self.commission_rate,
-                    slippage_rate=self.slippage_rate,
-                )
+                    # 添加数据到回测引擎
+                    for symbol, df in akquant_data.items():
+                        backtest.add_data(symbol, df)
 
-                # 添加数据到回测引擎
-                for symbol, df in akquant_data.items():
-                    backtest.add_data(symbol, df)
+                    # 运行回测
+                    result = backtest.run()
 
-                # 运行回测
-                result = backtest.run()
-
-                # 转换 akquant 结果为我们的 BacktestResult 格式
-                return BacktestResult(
-                    initial_capital=self.initial_capital,
-                    final_capital=result.final_capital,
-                    total_return=result.total_return,
-                    total_return_pct=result.total_return_pct,
-                    total_trades=result.total_trades,
-                    winning_trades=result.winning_trades,
-                    losing_trades=result.losing_trades,
-                    win_rate=result.win_rate,
-                    max_drawdown=result.max_drawdown,
-                    sharpe_ratio=result.sharpe_ratio,
-                    sortino_ratio=result.sortino_ratio,
-                    annual_return=result.annual_return,
-                    annual_volatility=result.annual_volatility,
-                    trades=[],  # 转换 akquant 交易记录
-                    equity_curve=result.equity_curve,
-                    monthly_returns=result.monthly_returns,
-                )
+                    # 转换 akquant 结果为我们的 BacktestResult 格式
+                    return BacktestResult(
+                        initial_capital=self.initial_capital,
+                        final_capital=result.final_capital,
+                        total_return=result.total_return,
+                        total_return_pct=result.total_return_pct,
+                        total_trades=result.total_trades,
+                        winning_trades=result.winning_trades,
+                        losing_trades=result.losing_trades,
+                        win_rate=result.win_rate,
+                        max_drawdown=result.max_drawdown,
+                        sharpe_ratio=result.sharpe_ratio,
+                        sortino_ratio=result.sortino_ratio,
+                        annual_return=result.annual_return,
+                        annual_volatility=result.annual_volatility,
+                        trades=[],  # 转换 akquant 交易记录
+                        equity_curve=result.equity_curve,
+                        monthly_returns=result.monthly_returns,
+                    )
+                else:
+                    raise ImportError("akquant 模块不存在或版本不兼容")
             except Exception as e:
                 logger.error(f"akquant 回测失败: {e}")
                 # 回退到本地回测
@@ -470,11 +486,11 @@ class BacktestEngine:
         for symbol, df in kline_data.items():
             date_col = date_column_map[symbol]
             all_dates.update(df[date_col].tolist())
-        all_dates = sorted(all_dates)
+        sorted_dates = sorted(all_dates)
 
         # 预计算每个日期的价格数据
         date_prices = {}
-        for date in all_dates:
+        for date in sorted_dates:
             prices = {}
             for symbol, df in kline_data.items():
                 date_col = date_column_map[symbol]
@@ -506,7 +522,7 @@ class BacktestEngine:
         current_date: str,
         prices: dict[str, float],
     ) -> list:
-        signals = []
+        signals: list = []
         return signals
 
     def _get_kline_data(

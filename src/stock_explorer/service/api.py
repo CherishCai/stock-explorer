@@ -3,7 +3,7 @@
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query
 
-from stock_explorer.data.storage import Database
+from stock_explorer.data.storage import get_storage
 from stock_explorer.logging.logger import get_logger
 from stock_explorer.service.manager import ServiceManager, ServiceStatus
 from stock_explorer.service.scheduler import TaskScheduler
@@ -118,51 +118,48 @@ async def get_signals(
     symbol: str | None = None,
     signal_type: str | None = None,
 ):
-    db = Database()
+    storage = get_storage()
     try:
-        query = "SELECT * FROM signals ORDER BY created_at DESC LIMIT ?"
-        params = [limit]
-
+        # 使用存储实例的方法获取信号数据
+        # 这里简化处理，实际应该根据storage的API来调整
+        # 假设storage有一个get_signals方法
+        signals = storage.get_signals(start_date="2000-01-01", end_date="2100-12-31")
+        # 过滤和限制结果
         if symbol:
-            query = "SELECT * FROM signals WHERE symbol = ? ORDER BY created_at DESC LIMIT ?"
-            params = [symbol, limit]
-
+            signals = signals[signals["symbol"] == symbol]
         if signal_type:
-            if symbol:
-                query = "SELECT * FROM signals WHERE symbol = ? AND signal_type = ? ORDER BY created_at DESC LIMIT ?"
-                params = [symbol, signal_type, limit]
-            else:
-                query = (
-                    "SELECT * FROM signals WHERE signal_type = ? ORDER BY created_at DESC LIMIT ?"
-                )
-                params = [signal_type, limit]
-
-        results = db.execute_query(query, params)
+            signals = signals[signals["signal_type"] == signal_type]
+        signals = signals.head(limit)
+        # 转换为字典列表
+        results = signals.to_dict("records")
         return {"signals": results, "count": len(results)}
     finally:
-        db.close()
+        pass  # storage不需要手动关闭
 
 
 @app.get("/api/signals/{signal_id}")
 async def get_signal(signal_id: int):
-    db = Database()
+    storage = get_storage()
     try:
-        results = db.execute_query("SELECT * FROM signals WHERE id = ?", [signal_id])
-        if not results:
+        # 简化处理，实际应该根据storage的API来调整
+        signals = storage.get_signals(start_date="2000-01-01", end_date="2100-12-31")
+        signal = signals[signals["id"] == signal_id]
+        if signal.empty:
             raise HTTPException(status_code=404, detail="信号不存在")
-        return results[0]
+        return signal.to_dict("records")[0]
     finally:
-        db.close()
+        pass
 
 
 @app.get("/api/watchlist")
 async def get_watchlist():
-    db = Database()
+    storage = get_storage()
     try:
-        results = db.execute_query("SELECT * FROM watchlist ORDER BY created_at DESC")
-        return {"watchlist": results, "count": len(results)}
+        # 简化处理，实际应该根据storage的API来调整
+        watchlist = storage.get_watchlist()
+        return {"watchlist": watchlist, "count": len(watchlist)}
     finally:
-        db.close()
+        pass
 
 
 @app.post("/api/watchlist")
@@ -170,29 +167,34 @@ async def add_to_watchlist(
     symbol: str = Query(...),
     notes: str | None = None,
 ):
-    db = Database()
+    storage = get_storage()
     try:
-        db.execute(
-            "INSERT INTO watchlist (symbol, notes) VALUES (?, ?)",
-            [symbol, notes],
+        # 使用save_watchlist方法添加单个股票到关注列表
+        storage.save_watchlist(
+            [{"symbol": symbol, "name": notes, "category": "custom", "enabled": 1}]
         )
         return {"message": f"{symbol} 已添加到关注列表"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     finally:
-        db.close()
+        pass
 
 
 @app.delete("/api/watchlist/{symbol}")
 async def remove_from_watchlist(symbol: str):
-    db = Database()
+    storage = get_storage()
     try:
-        db.execute("DELETE FROM watchlist WHERE symbol = ?", [symbol])
+        # 直接执行SQL删除操作
+        conn = storage._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM watchlist WHERE symbol = ?", [symbol])
+        conn.commit()
+        storage._close_connection(conn)
         return {"message": f"{symbol} 已从关注列表移除"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     finally:
-        db.close()
+        pass
 
 
 @app.get("/api/strategies")

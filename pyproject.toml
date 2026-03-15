@@ -57,5 +57,9 @@ disallow_untyped_defs = false
 
 [dependency-groups]
 dev = [
+    "mypy>=1.19.1",
+    "pandas-stubs>=3.0.0.260204",
     "pre-commit>=4.5.1",
+    "types-pyyaml>=6.0.12.20250915",
+    "types-requests>=2.32.4.20260107",
 ]

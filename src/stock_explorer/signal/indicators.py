@@ -83,13 +83,13 @@ class TechnicalIndicators:
 
         true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
         atr = true_range.rolling(window=period).mean()
-        return atr
+        return pd.Series(atr)
 
     @staticmethod
     def obv(close: pd.Series, volume: pd.Series) -> pd.Series:
         """能量潮 (OBV)"""
         obv = (np.sign(close.diff()) * volume).fillna(0).cumsum()
-        return obv
+        return pd.Series(obv)
 
     @staticmethod
     def cci(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 20) -> pd.Series:
@@ -98,7 +98,7 @@ class TechnicalIndicators:
         sma = tp.rolling(window=period).mean()
         mad = tp.rolling(window=period).apply(lambda x: np.abs(x - x.mean()).mean())
         cci = (tp - sma) / (0.015 * mad)
-        return cci
+        return pd.Series(cci)
 
     @staticmethod
     def wr(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
@@ -106,7 +106,7 @@ class TechnicalIndicators:
         highest_high = high.rolling(window=period).max()
         lowest_low = low.rolling(window=period).min()
         wr = -100 * (highest_high - close) / (highest_high - lowest_low)
-        return wr
+        return pd.Series(wr)
 
     @staticmethod
     def adx(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
@@ -130,4 +130,4 @@ class TechnicalIndicators:
         dx = 100 * np.abs(plus_di - minus_di) / (plus_di + minus_di)
         adx = dx.rolling(window=period).mean()
 
-        return adx
+        return pd.Series(adx)

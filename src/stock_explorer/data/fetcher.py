@@ -206,7 +206,8 @@ class DataFetcher:
             symbol = validate_stock_symbol(symbol)
             df = self._fetch_data(self.ak.stock_individual_info_em, symbol=symbol)
             if isinstance(df, pd.DataFrame) and not df.empty:
-                return df.to_dict(orient="records")[0]
+                stock_info: dict = df.to_dict(orient="records")[0]
+                return stock_info
             logger.warning(f"未获取到 {symbol} 个股信息")
             return {}
         except DataFetchError:

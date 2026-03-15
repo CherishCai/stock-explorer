@@ -133,9 +133,9 @@ class TaskScheduler:
         minute, hour, day, month, weekday = parts
 
         # 解析目标时间
-        target_minute = int(minute) if minute != '*' else now.minute
-        target_hour = int(hour) if hour != '*' else now.hour
-        target_weekday = int(weekday) if weekday != '*' else now.weekday()
+        target_minute = int(minute) if minute != "*" else now.minute
+        target_hour = int(hour) if hour != "*" else now.hour
+        target_weekday = int(weekday) if weekday != "*" else now.weekday()
 
         # 计算下次执行时间
         next_run = now

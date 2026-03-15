@@ -3,6 +3,7 @@
 import json
 import os
 import sqlite3
+from collections.abc import Sequence
 
 import pandas as pd
 
@@ -21,7 +22,7 @@ class DataStorage:
         self.pool_size = pool_size
         self._init_db()
         # 连接池
-        self._connection_pool = []
+        self._connection_pool: list = []
         self._pool_lock = None
 
     def _get_connection(self):
@@ -141,7 +142,7 @@ class DataStorage:
             for _, row in df.iterrows():
                 # 处理时间戳类型
                 date_value = row.get("date", row.get("日期"))
-                if hasattr(date_value, "strftime"):
+                if date_value and hasattr(date_value, "strftime"):
                     date_value = date_value.strftime("%Y-%m-%d")
 
                 cursor.execute(
@@ -210,7 +211,7 @@ class DataStorage:
             for signal in signals:
                 # 处理时间戳类型
                 timestamp = signal.get("timestamp")
-                if hasattr(timestamp, "strftime"):
+                if timestamp and hasattr(timestamp, "strftime"):
                     timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
                 cursor.execute(
@@ -245,7 +246,7 @@ class DataStorage:
                 self._close_connection(conn)
 
     def get_signals(
-        self, start_date: str, end_date: str, filters: dict = None, limit: int = None
+        self, start_date: str, end_date: str, filters: dict | None = None, limit: int | None = None
     ) -> pd.DataFrame:
         """获取信号记录"""
         conn = None
@@ -255,18 +256,18 @@ class DataStorage:
             SELECT * FROM signals
             WHERE timestamp >= ? AND timestamp <= ?
             """
-            params = [start_date, end_date]
+            params: Sequence = [start_date, end_date]
 
             if filters:
                 if filters.get("symbol"):
                     query += " AND symbol = ?"
-                    params.append(filters["symbol"])
+                    params = list(params) + [filters["symbol"]]
                 if filters.get("signal_type"):
                     query += " AND signal_type = ?"
-                    params.append(filters["signal_type"])
+                    params = list(params) + [filters["signal_type"]]
                 if filters.get("direction"):
                     query += " AND direction = ?"
-                    params.append(filters["direction"])
+                    params = list(params) + [filters["direction"]]
 
             query += " ORDER BY timestamp DESC"
 
@@ -292,7 +293,7 @@ class DataStorage:
 
             # 处理时间戳类型
             timestamp = alert.get("timestamp")
-            if hasattr(timestamp, "strftime"):
+            if timestamp and hasattr(timestamp, "strftime"):
                 timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
             cursor.execute(
@@ -321,7 +322,7 @@ class DataStorage:
             if conn:
                 self._close_connection(conn)
 
-    def get_alerts(self, start: str, end: str, channel: str = None) -> pd.DataFrame:
+    def get_alerts(self, start: str, end: str, channel: str | None = None) -> pd.DataFrame:
         """获取告警记录"""
         conn = None
         try:
@@ -330,11 +331,11 @@ class DataStorage:
             SELECT * FROM alerts
             WHERE timestamp >= ? AND timestamp <= ?
             """
-            params = [start, end]
+            params: Sequence = [start, end]
 
             if channel:
                 query += " AND channel = ?"
-                params.append(channel)
+                params = list(params) + [channel]
 
             query += " ORDER BY timestamp DESC"
 
@@ -387,7 +388,7 @@ class DataStorage:
             if conn:
                 self._close_connection(conn)
 
-    def get_watchlist(self, category: str = None) -> list[dict]:
+    def get_watchlist(self, category: str | None = None) -> list[dict]:
         """获取监控列表"""
         conn = None
         try:

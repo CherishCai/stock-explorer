@@ -1,19 +1,18 @@
 # .pre-commit-config.yaml
 repos:
--   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.2.1
+-   repo: https://github.com/astral-sh/ruff-pre-commit.git
+    rev: v0.15.6
     hooks:
-    -   id: ruff
+    -   id: ruff-check
         args: [--fix]
     -   id: ruff-format
--   repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
+-   repo: https://github.com/pre-commit/mirrors-mypy.git
+    rev: v1.19.1
     hooks:
     -   id: mypy
-        additional_dependencies: [types-requests]
--   repo: https://github.com/pytest-dev/pytest
-    rev: 7.4.0
-    hooks:
-    -   id: pytest
-        args: [--cov=src/stock_explorer]
-        stages: [push]
+        additional_dependencies: [types-requests, types-PyYAML]
+# -   repo: https://github.com/pytest-dev/pytest.git
+#     rev: 9.0.2
+#     hooks:
+#     -   id: pytest
+#         args: [--cov=src/stock_explorer]

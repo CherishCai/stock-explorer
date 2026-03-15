@@ -68,15 +68,16 @@ class CacheExpiryStrategy:
         # 从配置中读取
         if self.config:
             if cache_type == "realtime" and hasattr(self.config.redis, "realtime_ttl"):
-                return self.config.redis.realtime_ttl
+                return int(self.config.redis.realtime_ttl)
             elif cache_type == "hs300" and hasattr(self.config.redis, "hs300_cache_ttl"):
-                return self.config.redis.hs300_cache_ttl
+                return int(self.config.redis.hs300_cache_ttl)
             elif cache_type == "industry" and hasattr(self.config.redis, "industry_cache_ttl"):
-                return self.config.redis.industry_cache_ttl
+                return int(self.config.redis.industry_cache_ttl)
             elif cache_type == "market" and hasattr(self.config.redis, "market_cache_ttl"):
-                return self.config.redis.market_cache_ttl
+                return int(self.config.redis.market_cache_ttl)
 
-        return ttl_map.get(cache_type, ttl_map["default"])
+        default_ttl: int = ttl_map.get(cache_type, ttl_map["default"])
+        return default_ttl
 
 
 class CacheManager:
@@ -118,7 +119,8 @@ class CacheManager:
             是否成功
         """
         try:
-            return self.cache_client.set(key, value, ttl)
+            success: bool = self.cache_client.set(key, value, ttl)
+            return success
         except Exception:
             return False
 
@@ -132,7 +134,8 @@ class CacheManager:
             是否成功
         """
         try:
-            return self.cache_client.invalidate(key)
+            success: bool = self.cache_client.invalidate(key)
+            return success
         except Exception:
             return False
 

@@ -10,7 +10,7 @@ from rich.logging import RichHandler
 class Logger:
     """日志管理器"""
 
-    _loggers: dict = {}
+    _loggers: dict[str, logging.Logger] = {}
     _default_level = logging.INFO
 
     @classmethod

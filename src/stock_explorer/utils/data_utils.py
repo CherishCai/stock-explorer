@@ -16,11 +16,13 @@ def format_date(date_str: str) -> str:
         # 尝试解析各种日期格式
         for fmt in ["%Y-%m-%d", "%Y/%m/%d", "%Y%m%d"]:
             try:
-                return pd.to_datetime(date_str, format=fmt).strftime("%Y-%m-%d")
+                dt = pd.to_datetime(date_str, format=fmt)
+                return str(dt.strftime("%Y-%m-%d"))
             except ValueError:
                 continue
         # 最后尝试自动解析
-        return pd.to_datetime(date_str).strftime("%Y-%m-%d")
+        dt = pd.to_datetime(date_str)
+        return str(dt.strftime("%Y-%m-%d"))
     except Exception:
         return date_str
 
@@ -138,7 +140,8 @@ def get_date_range(start_date: str, end_date: str) -> list[str]:
     """
     start = pd.to_datetime(start_date)
     end = pd.to_datetime(end_date)
-    return pd.date_range(start, end).strftime("%Y-%m-%d").tolist()
+    date_range = pd.date_range(start, end)
+    return [date.strftime("%Y-%m-%d") for date in date_range]
 
 
 def is_market_open(date: str) -> bool:
@@ -154,6 +157,7 @@ def is_market_open(date: str) -> bool:
         # 这里可以根据实际情况实现交易日判断逻辑
         # 简单实现：排除周末
         dt = pd.to_datetime(date)
-        return dt.weekday() < 5  # 0-4是周一到周五
+        weekday: int = dt.weekday()
+        return weekday < 5  # 0-4是周一到周五
     except Exception:
         return False

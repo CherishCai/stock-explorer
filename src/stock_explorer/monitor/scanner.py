@@ -31,6 +31,7 @@ class MarketScanner:
         初始化数据获取器、缓存和信号注册中心
         """
         import threading
+
         self.fetcher = get_fetcher()
         self.cache = get_cache()
         self.signal_registry = SignalRegistry()
@@ -80,7 +81,7 @@ class MarketScanner:
 
     def _detect_signal(self, stock_data: dict[str, Any], detectors: list) -> list[Signal]:
         """检测单个股票的信号"""
-        signals = []
+        signals: list = []
         for detector in detectors:
             try:
                 signal = detector.detect(stock_data)
@@ -113,7 +114,10 @@ class MarketScanner:
         current_time = time.time()
 
         # 检查缓存是否有效
-        if self._quotes_cache is not None and (current_time - self._quotes_timestamp) < self._quotes_ttl:
+        if (
+            self._quotes_cache is not None
+            and (current_time - self._quotes_timestamp) < self._quotes_ttl
+        ):
             logger.info("使用缓存的实时行情数据")
             return self._quotes_cache
 
@@ -127,7 +131,10 @@ class MarketScanner:
 
             # 再次检查缓存（防止在等待锁的过程中其他线程已经更新了缓存）
             current_time = time.time()
-            if self._quotes_cache is not None and (current_time - self._quotes_timestamp) < self._quotes_ttl:
+            if (
+                self._quotes_cache is not None
+                and (current_time - self._quotes_timestamp) < self._quotes_ttl
+            ):
                 logger.info("使用缓存的实时行情数据")
                 return self._quotes_cache
 
@@ -153,7 +160,7 @@ class MarketScanner:
         Returns:
             list[Signal]: 检测到的信号列表
         """
-        signals = []
+        signals: list = []
 
         hs300_list = self._get_hs300_list()
         if not hs300_list:
@@ -254,7 +261,7 @@ class MarketScanner:
         Returns:
             list[Signal]: 检测到的信号列表
         """
-        signals = []
+        signals: list = []
 
         # 获取实时行情数据
         quotes = self._get_realtime_quotes()
@@ -361,7 +368,7 @@ class MarketScanner:
         Returns:
             list[Signal]: 检测到的信号列表
         """
-        signals = []
+        signals: list = []
 
         constituents = self.fetcher.fetch_stock_board_industry_cons(industry)
         if constituents.empty:
@@ -442,13 +449,14 @@ class MarketScanner:
         cached = self.cache.get_hs300_list()
         if cached:
             logger.info("从缓存获取沪深300成分股数据")
-            return cached
+            cached_list: list[dict] = cached
+            return cached_list
 
         df = self.fetcher.fetch_hs300_constituents()
         if df is None or df.empty:
             return []
 
-        result = df.to_dict("records")
+        result: list[dict] = df.to_dict("records")
         # 使用默认的TTL，不再硬编码
         self.cache.cache_hs300_list(result)
         logger.info("从远程接口获取沪深300成分股数据并缓存")
@@ -459,13 +467,14 @@ class MarketScanner:
         cached = self.cache.get_market_stocks()
         if cached:
             logger.info("从缓存获取全市场股票列表数据")
-            return cached
+            cached_list: list[dict] = cached
+            return cached_list
 
         df = self.fetcher.fetch_stock_list()
         if df is None or df.empty:
             return []
 
-        result = df.to_dict("records")
+        result: list[dict] = df.to_dict("records")
         # 使用默认的TTL，不再硬编码
         self.cache.cache_market_stocks(result)
         logger.info("从远程接口获取全市场股票列表数据并缓存")

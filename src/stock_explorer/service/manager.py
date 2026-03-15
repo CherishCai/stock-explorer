@@ -78,6 +78,7 @@ class ServiceManager:
             config = get_config()
             self._scanner = MarketScanner()
             from stock_explorer.monitor.notifier import create_notifier_manager
+
             self._notifier = create_notifier_manager(config.alert.model_dump())
 
             # 初始化线程池
@@ -233,7 +234,9 @@ class ServiceManager:
                         futures = []
                         # 限制扫描前10个行业，避免过多请求
                         for industry in industry_list[:10]:
-                            future = self._thread_pool.submit(self._scanner.scan_industry, industry, strategies)
+                            future = self._thread_pool.submit(
+                                self._scanner.scan_industry, industry, strategies
+                            )
                             futures.append((future, industry))
 
                         # 收集结果
@@ -413,6 +416,7 @@ class AsyncServiceManager:
             config = get_config()
             self._scanner = MarketScanner()
             from stock_explorer.monitor.notifier import create_notifier_manager
+
             self._notifier = create_notifier_manager(config.alert.model_dump())
             # 初始化信号量，控制并发数
             self._semaphore = asyncio.Semaphore(5)

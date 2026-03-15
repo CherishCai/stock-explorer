@@ -3,7 +3,7 @@
 import threading
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import yaml
 from pydantic import BaseModel, Field
@@ -146,7 +146,7 @@ class ConfigLoader:
 
     _instance: Optional["ConfigLoader"] = None
     _config: AppConfig | None = None
-    _observer: Observer | None = None
+    _observer: Any | None = None
     _watch_thread: threading.Thread | None = None
     _stop_event: threading.Event | None = None
 

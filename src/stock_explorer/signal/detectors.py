@@ -96,8 +96,8 @@ class RSIDetector(KlineBasedDetector):
     name = "rsi"
     signal_type = SignalType.TECHNICAL
     period = 14
-    overbought = 70
-    oversold = 30
+    overbought = 70.0
+    oversold = 30.0
 
     def __init__(self, period: int = 14, overbought: float = 70, oversold: float = 30):
         super().__init__()

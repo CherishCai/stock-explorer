@@ -180,7 +180,7 @@ class RollingAnalyzer:
     def calculate_rolling_sharpe(self, returns: pd.Series) -> pd.Series:
         rolling_mean = returns.rolling(window=self.window).mean()
         rolling_std = returns.rolling(window=self.window).std()
-        return (rolling_mean / rolling_std) * np.sqrt(252)
+        return pd.Series((rolling_mean / rolling_std) * np.sqrt(252))
 
     def calculate_rolling_drawdown(self, equity: pd.Series) -> pd.Series:
         cummax = equity.cummax()

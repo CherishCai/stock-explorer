@@ -247,7 +247,9 @@ def list_strategies():
 
 
 @app.command("data-hs300")
-def data_hs300(clear_cache: bool = typer.Option(False, "--clear-cache", help="清空沪深300成分股缓存")):
+def data_hs300(
+    clear_cache: bool = typer.Option(False, "--clear-cache", help="清空沪深300成分股缓存"),
+):
     """获取沪深300成分股"""
     if clear_cache:
         console.print("[bold]清空沪深300成分股缓存:[/bold]")
@@ -328,8 +330,8 @@ def data_industry(
     if detail:
         # 详细模式：显示前 N 行的完整数据
         console.print(f"[cyan]显示前 {top} 条详细数据:[/cyan]\n")
-        for idx, row in df.head(top).iterrows():
-            console.print(f"[bold green]第 {idx + 1} 条[/bold green]")
+        for i, (_idx, row) in enumerate(df.head(top).iterrows()):
+            console.print(f"[bold green]第 {i + 1} 条[/bold green]")
             for col in df.columns:
                 value = row[col]
                 console.print(f"  [yellow]{col}:[/yellow] {value}")
@@ -370,7 +372,20 @@ def data_industry(
         for col in key_columns:
             if col in df.columns:
                 config = column_configs.get(col, {})
-                table.add_column(str(col), header_style="bold cyan", **config)
+                justify = config.get("justify", "left")
+                width = config.get("width", None)
+                style = config.get("style", None)
+                no_wrap = config.get("no_wrap", False)
+                overflow = config.get("overflow", "ellipsis")
+                table.add_column(
+                    str(col),
+                    header_style="bold cyan",
+                    justify=justify,
+                    width=width,
+                    style=style,
+                    no_wrap=no_wrap,
+                    overflow=overflow,
+                )
 
         # 转换总市值为亿单位
         def format_market_cap(value):
@@ -397,7 +412,6 @@ def data_industry(
 
         console.print(table)
         console.print(f"\n[dim]共 {len(df)} 个行业板块[/dim]")
-
 
 
 @app.command("list-signals")
@@ -465,7 +479,9 @@ def daemon_start(
     manager = ServiceManager(config)
 
     console.print("[bold green]正在启动信号检测服务...[/bold green]")
-    console.print(f"  HS300扫描: {'启用' if config.enable_hs300_scan else '禁用'} (间隔 {config.scan_interval_hs300}秒)")
+    console.print(
+        f"  HS300扫描: {'启用' if config.enable_hs300_scan else '禁用'} (间隔 {config.scan_interval_hs300}秒)"
+    )
     console.print(
         f"  全市场扫描: {'启用' if config.enable_market_scan else '禁用'} (间隔 {config.scan_interval_market}秒)"
     )
