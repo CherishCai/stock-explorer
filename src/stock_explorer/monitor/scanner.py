@@ -52,34 +52,31 @@ class MarketScanner:
             bool: 如果市场开盘返回True，否则返回False
         """
         from stock_explorer.config.settings import get_config
-        
+
         # 检查配置是否设置了忽略市场开盘时间
         config = get_config()
         if config.ignore_market_hours:
             logger.info("忽略市场开盘时间检查")
             return True
-        
+
         now = datetime.now()
-        
+
         # 检查是否是工作日（周一到周五）
         if now.weekday() >= 5:  # 0=周一, 4=周五, 5=周六, 6=周日
             return False
-        
+
         current_time = now.time()
-        
+
         # 检查是否在上午交易时间
         morning_start = time(9, 30)
         morning_end = time(11, 30)
         if morning_start <= current_time <= morning_end:
             return True
-        
+
         # 检查是否在下午交易时间
         afternoon_start = time(13, 0)
         afternoon_end = time(15, 0)
-        if afternoon_start <= current_time <= afternoon_end:
-            return True
-        
-        return False
+        return afternoon_start <= current_time <= afternoon_end
 
     def _detect_signal(self, stock_data: dict[str, Any], detectors: list) -> list[Signal]:
         """检测单个股票的信号"""
@@ -105,8 +102,9 @@ class MarketScanner:
             DataFrame: 实时行情数据
         """
         import time
+
         import pandas as pd
-        
+
         # 检查市场是否开盘
         if not self.is_market_open():
             logger.info("市场未开盘，返回空数据")
@@ -126,7 +124,7 @@ class MarketScanner:
             if not self.is_market_open():
                 logger.info("市场未开盘，返回空数据")
                 return pd.DataFrame()
-                
+
             # 再次检查缓存（防止在等待锁的过程中其他线程已经更新了缓存）
             current_time = time.time()
             if self._quotes_cache is not None and (current_time - self._quotes_timestamp) < self._quotes_ttl:

@@ -4,12 +4,10 @@ import asyncio
 import concurrent.futures
 import signal
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from enum import Enum
-
 from datetime import datetime, time
+from enum import Enum
 
 from stock_explorer.config.settings import get_config
 from stock_explorer.data.cache import get_cache
@@ -329,34 +327,31 @@ class ServiceManager:
             bool: 如果市场开盘返回True，否则返回False
         """
         from stock_explorer.config.settings import get_config
-        
+
         # 检查配置是否设置了忽略市场开盘时间
         config = get_config()
         if config.ignore_market_hours:
             logger.info("忽略市场开盘时间检查")
             return True
-        
+
         now = datetime.now()
-        
+
         # 检查是否是工作日（周一到周五）
         if now.weekday() >= 5:  # 0=周一, 4=周五, 5=周六, 6=周日
             return False
-        
+
         current_time = now.time()
-        
+
         # 检查是否在上午交易时间
         morning_start = time(9, 30)
         morning_end = time(11, 30)
         if morning_start <= current_time <= morning_end:
             return True
-        
+
         # 检查是否在下午交易时间
         afternoon_start = time(13, 0)
         afternoon_end = time(15, 0)
-        if afternoon_start <= current_time <= afternoon_end:
-            return True
-        
-        return False
+        return afternoon_start <= current_time <= afternoon_end
 
     def _refresh_cache_data(self):
         """刷新缓存数据
@@ -490,34 +485,31 @@ class AsyncServiceManager:
             bool: 如果市场开盘返回True，否则返回False
         """
         from stock_explorer.config.settings import get_config
-        
+
         # 检查配置是否设置了忽略市场开盘时间
         config = get_config()
         if config.ignore_market_hours:
             logger.info("忽略市场开盘时间检查")
             return True
-        
+
         now = datetime.now()
-        
+
         # 检查是否是工作日（周一到周五）
         if now.weekday() >= 5:  # 0=周一, 4=周五, 5=周六, 6=周日
             return False
-        
+
         current_time = now.time()
-        
+
         # 检查是否在上午交易时间
         morning_start = time(9, 30)
         morning_end = time(11, 30)
         if morning_start <= current_time <= morning_end:
             return True
-        
+
         # 检查是否在下午交易时间
         afternoon_start = time(13, 0)
         afternoon_end = time(15, 0)
-        if afternoon_start <= current_time <= afternoon_end:
-            return True
-        
-        return False
+        return afternoon_start <= current_time <= afternoon_end
 
     async def _run_scanner(self, scanner_func, strategies, interval, error_prefix):
         """通用扫描方法"""

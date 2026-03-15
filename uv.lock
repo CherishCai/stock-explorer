@@ -1735,6 +1735,11 @@ dev = [
     { name = "ruff" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pre-commit" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.11.0" },
@@ -1762,6 +1767,9 @@ requires-dist = [
     { name = "watchdog", specifier = ">=6.0.0" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pre-commit", specifier = ">=4.5.1" }]
 
 [[package]]
 name = "tabulate"
