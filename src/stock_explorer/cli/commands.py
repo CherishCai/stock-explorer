@@ -458,7 +458,27 @@ def daemon_start(
     background: bool = typer.Option(False, "--background", "-b", help="后台运行"),
 ):
     """启动常驻服务"""
+    import os
+    import sys
+    from pathlib import Path
+
     from stock_explorer.service.manager import ServiceConfig, ServiceManager
+
+    # PID 文件路径
+    pid_file = Path("./stock-explorer.pid")
+
+    # 检查是否已经有服务在运行
+    if pid_file.exists():
+        try:
+            with open(pid_file) as f:
+                pid = int(f.read().strip())
+            # 检查进程是否存在
+            os.kill(pid, 0)
+            console.print("[bold red]服务已经在运行中[/bold red]")
+            raise typer.Exit(1)
+        except (ValueError, OSError):
+            # PID 文件存在但进程不存在，删除 PID 文件
+            pid_file.unlink()
 
     # 从配置文件读取扫描间隔设置
     config_obj = get_config()
@@ -491,7 +511,43 @@ def daemon_start(
 
     try:
         manager.start()
-        console.print("[bold green]服务已启动，按 Ctrl+C 停止[/bold green]")
+        if not background:
+            console.print("[bold green]服务已启动，按 Ctrl+C 停止[/bold green]")
+        else:
+            # 实现后台运行
+            console.print("[green]服务将在后台运行...[/green]")
+
+            # 第一次fork
+            pid = os.fork()
+            if pid > 0:
+                # 父进程退出
+                console.print("[bold green]服务已在后台启动[/bold green]")
+                sys.exit(0)
+
+            # 子进程继续
+            os.setsid()
+
+            # 第二次fork
+            pid = os.fork()
+            if pid > 0:
+                # 第一个子进程退出
+                sys.exit(0)
+
+            # 第二个子进程继续
+            # 关闭标准文件描述符
+            sys.stdin.close()
+            sys.stdout.close()
+            sys.stderr.close()
+
+            # 重定向标准文件描述符到/dev/null
+            os.open(os.devnull, os.O_RDWR)  # stdin
+            os.dup2(0, 1)  # stdout
+            os.dup2(0, 2)  # stderr
+
+        # 写入 PID 文件
+        if background:
+            with open(pid_file, "w") as f:
+                f.write(str(os.getpid()))
 
         import time
 
@@ -499,11 +555,19 @@ def daemon_start(
             while manager.status.value == "running":
                 time.sleep(1)
         except KeyboardInterrupt:
-            console.print("\n[yellow]正在停止服务...[/yellow]")
-            manager.stop()
-            console.print("[green]服务已停止[/green]")
+            if not background:
+                console.print("\n[yellow]正在停止服务...[/yellow]")
+                manager.stop()
+                console.print("[green]服务已停止[/green]")
+        finally:
+            # 清理 PID 文件
+            if background and pid_file.exists():
+                pid_file.unlink()
 
     except Exception as e:
+        # 清理 PID 文件
+        if background and pid_file.exists():
+            pid_file.unlink()
         console.print(f"[bold red]服务启动失败: {e}[/bold red]")
         raise typer.Exit(1) from e
 
