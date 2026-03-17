@@ -1,10 +1,36 @@
 """日志模块 - 统一日志管理"""
 
 import logging
+import os
+from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import override
+from zoneinfo import ZoneInfo
 
 from rich.logging import RichHandler
+
+SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
+
+os.environ["TZ"] = "Asia/Shanghai"
+
+
+def get_shanghai_time() -> datetime:
+    """获取上海时区的当前时间"""
+    return datetime.now(SHANGHAI_TZ)
+
+
+class ShanghaiTimeFormatter(logging.Formatter):
+    """使用上海时区的格式化器"""
+
+    @override
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
+        """重写 formatTime 方法，使用上海时区"""
+        ct = datetime.fromtimestamp(record.created, tz=UTC)
+        ct_shanghai = ct.astimezone(SHANGHAI_TZ)
+        if datefmt:
+            return ct_shanghai.strftime(datefmt)
+        return ct_shanghai.isoformat()
 
 
 class Logger:
@@ -29,7 +55,7 @@ class Logger:
         logger.handlers.clear()
         logger.propagate = False
 
-        formatter = logging.Formatter(
+        shanghai_formatter = ShanghaiTimeFormatter(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
@@ -54,7 +80,7 @@ class Logger:
                 encoding="utf-8",
             )
             file_handler.setLevel(level)
-            file_handler.setFormatter(formatter)
+            file_handler.setFormatter(shanghai_formatter)
             logger.addHandler(file_handler)
 
         cls._loggers[name] = logger
@@ -80,16 +106,14 @@ def setup_logging(
     """设置全局日志"""
     Logger.set_level(level)
     if log_file:
-        # 确保创建主 logger
         Logger.get_logger("stock_explorer", log_file, level)
 
-        # 为所有已创建的 logger 添加文件处理器
         for _name, logger in Logger._loggers.items():
             if "RotatingFileHandler" not in [h.__class__.__name__ for h in logger.handlers]:
                 log_path = Path(log_file)
                 log_path.parent.mkdir(parents=True, exist_ok=True)
 
-                formatter = logging.Formatter(
+                shanghai_formatter = ShanghaiTimeFormatter(
                     "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
                     datefmt="%Y-%m-%d %H:%M:%S",
                 )
@@ -101,5 +125,5 @@ def setup_logging(
                     encoding="utf-8",
                 )
                 file_handler.setLevel(level)
-                file_handler.setFormatter(formatter)
+                file_handler.setFormatter(shanghai_formatter)
                 logger.addHandler(file_handler)
