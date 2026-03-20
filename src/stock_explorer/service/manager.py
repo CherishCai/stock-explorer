@@ -45,7 +45,7 @@ class ServiceConfig:
 
 
 class ServiceManager:
-    def __init__(self, config: ServiceConfig | None = None):
+    def __init__(self, config: ServiceConfig | None = None, pid_file: str | None = None):
         self.config = config or ServiceConfig()
         self.status = ServiceStatus.STOPPED
         self._stop_event = threading.Event()
@@ -57,6 +57,7 @@ class ServiceManager:
         self._cache = get_cache()
         self._fetcher = get_fetcher()
         self._scheduler = None
+        self._pid_file = pid_file
 
     def _signal_handler(self, signum, frame):
         logger.info(f"收到信号 {signum}, 准备停止服务...")
@@ -184,9 +185,19 @@ class ServiceManager:
         """通用扫描方法"""
         while not self._stop_event.is_set():
             try:
-                # 检查市场是否开盘
-                if self.is_market_open():
+                logger.info("检查市场是否开盘...")
+                is_open = self.is_market_open()
+                logger.info(f"市场开盘检查结果: {is_open}")
+                if is_open:
+                    logger.info(f"市场已开盘，开始{error_prefix}扫描...")
+                    import time
+
+                    start_time = time.time()
                     signals = scanner_func(strategies)
+                    elapsed = time.time() - start_time
+                    logger.info(
+                        f"{error_prefix}扫描完成，结果: {len(signals)} 个信号，耗时: {elapsed:.2f}秒"
+                    )
                     self._process_signals(signals)
                 else:
                     logger.info(f"市场未开盘，暂停{error_prefix}扫描")
@@ -194,7 +205,7 @@ class ServiceManager:
                     self._stop_event.wait(interval)  # 等待配置的扫描间隔后再次检查
                     continue
             except Exception as e:
-                logger.error(f"{error_prefix} 扫描出错: {e}")
+                logger.error(f"{error_prefix} 扫描出错: {e}", exc_info=True)
 
             self._stop_event.wait(interval)
 
@@ -281,12 +292,10 @@ class ServiceManager:
         for thread in self._threads:
             thread.join(timeout=5)
 
-        # 关闭线程池
         if self._thread_pool:
             self._thread_pool.shutdown(wait=True, cancel_futures=True)
             logger.info("线程池已关闭")
 
-        # 停止配置文件监控
         try:
             from stock_explorer.config.settings import ConfigLoader
 
@@ -296,14 +305,30 @@ class ServiceManager:
         except Exception as e:
             logger.error(f"停止配置文件监控失败: {e}")
 
-        # 停止任务调度器
         if self._scheduler:
-            self._scheduler.stop()
-            logger.info("任务调度器已停止")
+            try:
+                self._scheduler.stop()
+                logger.info("任务调度器已停止")
+            except Exception as e:
+                logger.error(f"停止任务调度器失败: {e}")
 
         self._threads.clear()
         self.status = ServiceStatus.STOPPED
         logger.info("服务已停止")
+
+        self._cleanup_pid_file()
+
+    def _cleanup_pid_file(self):
+        if self._pid_file:
+            try:
+                from pathlib import Path
+
+                pid_path = Path(self._pid_file)
+                if pid_path.exists():
+                    pid_path.unlink()
+                    logger.info(f"PID 文件已删除: {self._pid_file}")
+            except Exception as e:
+                logger.error(f"删除 PID 文件失败: {e}")
 
     def restart(self):
         logger.info("重启服务...")

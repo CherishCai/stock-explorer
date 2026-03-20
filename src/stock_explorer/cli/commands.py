@@ -464,26 +464,20 @@ def daemon_start(
 
     from stock_explorer.service.manager import ServiceConfig, ServiceManager
 
-    # PID 文件路径
     pid_file = Path("./stock-explorer.pid")
 
-    # 检查是否已经有服务在运行
     if pid_file.exists():
         try:
             with open(pid_file) as f:
                 pid = int(f.read().strip())
-            # 检查进程是否存在
             os.kill(pid, 0)
             console.print("[bold red]服务已经在运行中[/bold red]")
             raise typer.Exit(1)
         except (ValueError, OSError):
-            # PID 文件存在但进程不存在，删除 PID 文件
             pid_file.unlink()
 
-    # 从配置文件读取扫描间隔设置
     config_obj = get_config()
 
-    # 创建服务配置
     config = ServiceConfig(
         scan_interval_hs300=config_obj.scan.hs300.interval,
         scan_interval_market=config_obj.scan.market.interval,
@@ -495,8 +489,6 @@ def daemon_start(
         market_strategies=",".join(config_obj.scan.market.strategies),
         industry_strategies=",".join(config_obj.scan.industry.strategies),
     )
-
-    manager = ServiceManager(config)
 
     console.print("[bold green]正在启动信号检测服务...[/bold green]")
     console.print(
@@ -510,62 +502,84 @@ def daemon_start(
     )
 
     try:
-        manager.start()
         if not background:
+            manager = ServiceManager(config)
+            manager.start()
             console.print("[bold green]服务已启动，按 Ctrl+C 停止[/bold green]")
-        else:
-            # 实现后台运行
-            console.print("[green]服务将在后台运行...[/green]")
+            import time
 
-            # 第一次fork
-            pid = os.fork()
-            if pid > 0:
-                # 父进程退出
-                console.print("[bold green]服务已在后台启动[/bold green]")
-                sys.exit(0)
-
-            # 子进程继续
-            os.setsid()
-
-            # 第二次fork
-            pid = os.fork()
-            if pid > 0:
-                # 第一个子进程退出
-                sys.exit(0)
-
-            # 第二个子进程继续
-            # 关闭标准文件描述符
-            sys.stdin.close()
-            sys.stdout.close()
-            sys.stderr.close()
-
-            # 重定向标准文件描述符到/dev/null
-            os.open(os.devnull, os.O_RDWR)  # stdin
-            os.dup2(0, 1)  # stdout
-            os.dup2(0, 2)  # stderr
-
-        # 写入 PID 文件
-        if background:
-            with open(pid_file, "w") as f:
-                f.write(str(os.getpid()))
-
-        import time
-
-        try:
-            while manager.status.value == "running":
-                time.sleep(1)
-        except KeyboardInterrupt:
-            if not background:
+            try:
+                while manager.status.value == "running":
+                    time.sleep(1)
+            except KeyboardInterrupt:
                 console.print("\n[yellow]正在停止服务...[/yellow]")
                 manager.stop()
                 console.print("[green]服务已停止[/green]")
-        finally:
-            # 清理 PID 文件
-            if background and pid_file.exists():
-                pid_file.unlink()
+        else:
+            console.print("[green]服务将在后台运行...[/green]")
+
+            import subprocess
+            import tempfile
+
+            log_dir = Path("logs")
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_file = log_dir / "daemon.log"
+
+            script_content = f"""#!/usr/bin/env python3
+import sys
+import signal
+from pathlib import Path
+
+sys.path.insert(0, '.')
+
+from stock_explorer.service.manager import ServiceManager, ServiceConfig
+
+def cleanup(signum, frame):
+    Path('stock-explorer.pid').unlink(missing_ok=True)
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, cleanup)
+signal.signal(signal.SIGINT, cleanup)
+
+config = ServiceConfig(
+    scan_interval_hs300={config.scan_interval_hs300},
+    scan_interval_market={config.scan_interval_market},
+    scan_interval_industry={config.scan_interval_industry},
+    enable_hs300_scan={config.enable_hs300_scan},
+    enable_market_scan={config.enable_market_scan},
+    enable_industry_scan={config.enable_industry_scan},
+    hs300_strategies="{config.hs300_strategies}",
+    market_strategies="{config.market_strategies}",
+    industry_strategies="{config.industry_strategies}",
+)
+
+manager = ServiceManager(config, pid_file="stock-explorer.pid")
+manager.start()
+
+while manager.status.value == "running":
+    import time
+    time.sleep(1)
+"""
+
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as script_file:
+                script_file.write(script_content)
+                script_path = script_file.name
+
+            with open(log_file, "a") as log_f:
+                proc = subprocess.Popen(
+                    [sys.executable, script_path],
+                    stdout=log_f,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+
+            with open(pid_file, "w") as f:
+                f.write(str(proc.pid))
+
+            console.print(f"[bold green]服务已在后台启动 (PID: {proc.pid})[/bold green]")
+            sys.exit(0)
 
     except Exception as e:
-        # 清理 PID 文件
         if background and pid_file.exists():
             pid_file.unlink()
         console.print(f"[bold red]服务启动失败: {e}[/bold red]")
